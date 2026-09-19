@@ -1,0 +1,176 @@
+{
+  "0x00000116": {
+    "name": "VIDEO_TDR_FAILURE",
+    "title": "Graphics Driver Hang / Timeout (VIDEO_TDR_FAILURE)",
+    "category": "gpu",
+    "severity": "critical",
+    "description": "Windows detected that the graphics card (GPU) stopped responding and failed to reset within the allotted timeout period (usually 2 seconds).",
+    "likelyCauses": [
+      "GPU driver crash, corruption, or incompatibility",
+      "Graphics card is improperly seated in the motherboard PCIe slot or sagging",
+      "Loose 12VHPWR or PCIe 8-pin power cables from the power supply",
+      "GPU overheating (thermal throttling leading to core halt)",
+      "Unstable GPU overclock or undervolt"
+    ],
+    "remediationSteps": [
+      "Check GPU physical seating: Ensure the GPU is firmly locked into the PCIe x16 slot with the latch clicked, and install a GPU support bracket if sagging.",
+      "Check PCIe power cables: Verify all 8-pin / 12VHPWR cables are firmly seated with no bends near the connector.",
+      "Perform clean GPU driver reinstall: Use Display Driver Uninstaller (DDU) in Windows Safe Mode, then install the latest official NVIDIA/AMD/Intel driver.",
+      "Monitor GPU thermals: Use HWMonitor or MSI Afterburner to ensure GPU core and hotspot temperatures stay below 85°C under load.",
+      "Disable unstable overclocks: Reset any GPU/VRAM overclocking software to factory defaults."
+    ]
+  },
+  "0x00000117": {
+    "name": "VIDEO_TDR_TIMEOUT_DETECTED",
+    "title": "Graphics Card Video Recovery Timeout",
+    "category": "gpu",
+    "severity": "warning",
+    "description": "The GPU failed to respond to a display command, but Windows attempted a live driver restart.",
+    "likelyCauses": [
+      "Overburdened GPU memory or transient driver glitch",
+      "Insufficient PCIe power delivery during peak transient spikes",
+      "Background hardware-accelerated app conflict (Discord, Chrome, etc.)"
+    ],
+    "remediationSteps": [
+      "Update or reinstall graphics drivers.",
+      "Disable 'Hardware Acceleration' in Discord/Chrome if crashes occur during multitasking.",
+      "Check that your power supply wattage covers your GPU's transient power spikes."
+    ]
+  },
+  "0x00000124": {
+    "name": "WHEA_UNCORRECTABLE_ERROR",
+    "title": "Fatal Hardware Architecture Error (WHEA)",
+    "category": "hardware",
+    "severity": "critical",
+    "description": "Windows Hardware Error Architecture (WHEA) caught a fatal, non-recoverable hardware fault directly from the CPU, PCIe bus, or memory controllers.",
+    "likelyCauses": [
+      "Unstable CPU voltage or aggressive overclock/undervolt (e.g. Curve Optimizer)",
+      "CPU overheating or VRM throttling under heavy load",
+      "Faulty NVMe SSD or deteriorating PCIe lane communication",
+      "Failing motherboard chipset or CPU core degradation"
+    ],
+    "remediationSteps": [
+      "Reset BIOS/UEFI settings to Optimized Defaults to disable any unstable CPU/RAM overclocks (XMP/EXPO, PBO, Curve Optimizer).",
+      "Check CPU temperatures: Verify CPU cooler pump is running and thermal paste is adequate.",
+      "Update Motherboard BIOS to the latest microcode update.",
+      "Reseat the primary NVMe SSD and graphics card in their PCIe slots."
+    ]
+  },
+  "0x0000003B": {
+    "name": "SYSTEM_SERVICE_EXCEPTION",
+    "title": "System Service Driver Fault",
+    "category": "driver",
+    "severity": "critical",
+    "description": "An executing system service or kernel driver executed an instruction that generated an unhandled exception.",
+    "likelyCauses": [
+      "Corrupt or outdated device drivers (audio, network, or peripheral drivers)",
+      "Corrupted Windows system files (e.g., following a forced shutdown)",
+      "Conflicting third-party antivirus or kernel-level anti-cheat software"
+    ],
+    "remediationSteps": [
+      "Run System File Checker: Open PowerShell as Admin and run `sfc /scannow` and `DISM /Online /Cleanup-Image /RestoreHealth`.",
+      "Update motherboard chipset, audio, and network drivers from manufacturer support page.",
+      "Check the minidump faulting module name in technical details to pinpoint the exact driver."
+    ]
+  },
+  "0x000000D1": {
+    "name": "DRIVER_IRQL_NOT_LESS_OR_EQUAL",
+    "title": "Driver Memory Access Fault (DRIVER_IRQL)",
+    "category": "driver",
+    "severity": "critical",
+    "description": "A kernel driver attempted to access pageable memory at an invalid interrupt request level (IRQL).",
+    "likelyCauses": [
+      "Faulty third-party driver attempting illegal memory access",
+      "Unstable RAM memory timings or defective memory stick"
+    ],
+    "remediationSteps": [
+      "Identify the specific driver named in the crash dump (often network, VPN, or audio driver).",
+      "Run Windows Memory Diagnostic (`mdsched.exe`) to rule out faulty RAM.",
+      "Update or roll back the implicated device driver."
+    ]
+  },
+  "0x0000001A": {
+    "name": "MEMORY_MANAGEMENT",
+    "title": "Severe Memory Management Error",
+    "category": "memory",
+    "severity": "critical",
+    "description": "A severe memory management error occurred. This is one of the strongest indicators of bad RAM, unstable XMP/EXPO, or dying storage holding the pagefile.",
+    "likelyCauses": [
+      "Failing or degrading physical RAM module",
+      "Unstable XMP / DOCP / EXPO memory profile in BIOS",
+      "Bad sectors on the drive hosting the Windows pagefile (`pagefile.sys`)"
+    ],
+    "remediationSteps": [
+      "Run Windows Memory Diagnostic: Press Win+R, type `mdsched.exe`, and choose 'Restart now and check for problems'.",
+      "Enter BIOS/UEFI and temporarily disable XMP/EXPO to see if memory stability returns.",
+      "Test RAM sticks individually in memory slot A2/B2 to isolate a failing stick.",
+      "Check SSD health status in the Storage section of this app."
+    ]
+  },
+  "0x00000050": {
+    "name": "PAGE_FAULT_IN_NONPAGED_AREA",
+    "title": "Invalid Memory Access in Non-Paged Area",
+    "category": "memory",
+    "severity": "critical",
+    "description": "The system attempted to access invalid system memory that cannot be paged out.",
+    "likelyCauses": [
+      "Faulty RAM hardware or defective motherboard RAM slot",
+      "Defective L2/L3 processor cache",
+      "Corrupted antivirus or system service driver"
+    ],
+    "remediationSteps": [
+      "Run a thorough memory test (MemTest86 or Windows Memory Diagnostic).",
+      "Reseat all RAM modules firmly into the motherboard slots.",
+      "Run `chkdsk C: /f /r` to verify disk file system integrity."
+    ]
+  },
+  "0x00000133": {
+    "name": "DPC_WATCHDOG_VIOLATION",
+    "title": "DPC Watchdog Timeout Violation",
+    "category": "driver",
+    "severity": "critical",
+    "description": "A deferred procedure call (DPC) ran for too long, or the system spent too much time at an interrupt level.",
+    "likelyCauses": [
+      "Outdated SSD firmware or corrupted storage AHCI/NVMe controller driver",
+      "Conflicting network or Wi-Fi driver hanging the kernel DPC queue"
+    ],
+    "remediationSteps": [
+      "Update SSD firmware using Samsung Magician, Crucial Storage Executive, or vendor software.",
+      "Update the Standard NVM Express Controller or Intel/AMD SATA AHCI driver.",
+      "Update Wi-Fi and Ethernet network adapter drivers."
+    ]
+  },
+  "0x0000009F": {
+    "name": "DRIVER_POWER_STATE_FAILURE",
+    "title": "Driver Power State Transition Failure",
+    "category": "power",
+    "severity": "critical",
+    "description": "A device driver failed to transition between sleep, hibernation, or awake states within the expected time.",
+    "likelyCauses": [
+      "Device driver unable to handle Windows Modern Standby / Sleep states",
+      "Peripheral device (USB dock, audio interface, Bluetooth adapter) freezing on wake"
+    ],
+    "remediationSteps": [
+      "Update all peripheral, Bluetooth, and motherboard chipset drivers.",
+      "Disable Fast Startup in Windows Power Options (Control Panel -> Power Options -> Choose what power buttons do -> uncheck 'Turn on fast startup').",
+      "Disconnect non-essential external USB hubs to see if sleep crashes cease."
+    ]
+  },
+  "0x000000EF": {
+    "name": "CRITICAL_PROCESS_DIED",
+    "title": "Critical Windows Process Terminated",
+    "category": "system",
+    "severity": "critical",
+    "description": "A critical system process required for Windows operation (such as `csrss.exe` or `wininit.exe`) terminated unexpectedly.",
+    "likelyCauses": [
+      "Severe Windows system file corruption",
+      "NVMe SSD suddenly disconnecting or failing read operations",
+      "Malware interference or corrupted Windows updates"
+    ],
+    "remediationSteps": [
+      "Run `DISM.exe /Online /Cleanup-image /Restorehealth` followed by `sfc /scannow` in Admin PowerShell.",
+      "Check NVMe SSD temperature and SMART health in the Storage section.",
+      "Check Windows Update history and roll back any recently installed problematic updates."
+    ]
+  }
+}

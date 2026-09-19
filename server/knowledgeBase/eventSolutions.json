@@ -1,0 +1,168 @@
+{
+  "Event_41_HardPowerLoss": {
+    "title": "Abrupt Power Loss Without Blue Screen (Event 41)",
+    "category": "power",
+    "severity": "critical",
+    "description": "Your PC rebooted or shut down instantly without a Windows Blue Screen (BugcheckCode is 0). This means power to the motherboard cut out before Windows could even log a crash dump.",
+    "likelyCauses": [
+      "Power supply (PSU) failure, over-current protection (OCP) trip, or transient power surge",
+      "Loose power cable at the back of the PC case, wall outlet, or power strip",
+      "Faulty surge protector or uninterruptible power supply (UPS) battery overload",
+      "Manual hard reset (holding down the physical power button for 5+ seconds)"
+    ],
+    "remediationSteps": [
+      "Check physical cables: Ensure the main power cord is pressed firmly into the power supply socket and wall outlet.",
+      "Bypass power strip / UPS: Plug the PC power cord directly into a known good wall outlet to eliminate strip/surge protector faults.",
+      "Check modular PSU cables: If your power supply is modular, make sure cables (especially the 24-pin motherboard and GPU cables) are clicked tightly into the PSU chassis.",
+      "Inspect PSU capacity: If this happens while launching intensive 3D games or heavy workloads, your GPU's transient power draw may be tripping the power supply's protection circuit.",
+      "If you manually held down the power button to force a restart, this is expected behavior and not a hardware fault."
+    ]
+  },
+  "Event_41_Crash": {
+    "title": "Unexpected Reboot Following Blue Screen (Event 41)",
+    "category": "bsod",
+    "severity": "critical",
+    "description": "Your PC crashed due to a kernel stop error (Blue Screen). A crash dump was recorded before the reboot.",
+    "likelyCauses": [
+      "Corrupt device driver (GPU, chipset, or storage)",
+      "Unstable memory or failing hardware component",
+      "Operating system kernel corruption"
+    ],
+    "remediationSteps": [
+      "Refer to the specific BugCheck code identified in the technical details below for targeted fixes.",
+      "Ensure all hardware drivers (especially graphics and chipset) are up to date.",
+      "Run System File Checker: `sfc /scannow` in an elevated command prompt."
+    ]
+  },
+  "Event_6008": {
+    "title": "Unexpected System Shutdown Detected (Event 6008)",
+    "category": "power",
+    "severity": "warning",
+    "description": "The Event Log service detected that the previous shutdown at the indicated time was unexpected.",
+    "likelyCauses": [
+      "System freeze, power outage, or emergency thermal shutdown",
+      "Power lost while PC was in sleep or modern standby"
+    ],
+    "remediationSteps": [
+      "Check if this coincided with a power outage or an Event 41 power loss.",
+      "Verify that cooling fans are spinning properly and airflow is unobstructed.",
+      "Check whether Windows Modern Standby is waking and overheating in a laptop sleeve/bag."
+    ]
+  },
+  "Event_1074": {
+    "title": "Normal / Planned System Shutdown (Event 1074)",
+    "category": "power",
+    "severity": "info",
+    "description": "The system was cleanly shut down or restarted by a user or an automated process (such as Windows Update).",
+    "likelyCauses": [
+      "User clicked 'Shut down' or 'Restart' in the Start menu",
+      "Windows Update rebooted the system to apply software updates",
+      "An installer or utility triggered a clean restart"
+    ],
+    "remediationSteps": [
+      "No action required. This was a healthy, graceful shutdown."
+    ]
+  },
+  "Event_4101": {
+    "title": "Display Driver Stopped Responding and Recovered (TDR - Event 4101)",
+    "category": "gpu",
+    "severity": "warning",
+    "description": "Windows detected that your graphics driver became unresponsive and successfully performed a live restart without crashing your entire PC.",
+    "likelyCauses": [
+      "GPU driver crash caused by software conflict or corrupted driver files",
+      "Graphics card sagging or loose in the PCIe slot causing transient signal drops",
+      "GPU core or memory overheating under sudden graphical load",
+      "Unstable GPU clock speeds or voltage drops"
+    ],
+    "remediationSteps": [
+      "Clean install GPU drivers: Run Display Driver Uninstaller (DDU) to wipe existing drivers, then install clean drivers from NVIDIA, AMD, or Intel.",
+      "Inspect PCIe seating: Power off the PC, remove and re-seat the graphics card firmly into the PCIe slot until the retention latch snaps closed.",
+      "Check for GPU sag: If your graphics card is large or heavy, install an anti-sag support bracket to prevent PCIe pin disconnection.",
+      "Verify power: Ensure each 8-pin PCIe power connector uses a separate cable from the power supply (avoid daisy-chain pigtail cables if possible)."
+    ]
+  },
+  "Event_WHEA_PCIe": {
+    "title": "PCI Express Bus Error Detected (WHEA-Logger)",
+    "category": "hardware",
+    "severity": "critical",
+    "description": "Windows Hardware Error Architecture (WHEA) reported a bus error on a PCI Express root port or endpoint (graphics card or NVMe SSD).",
+    "likelyCauses": [
+      "Physical contact issue in PCIe slot (GPU sag or unseated card)",
+      "PCIe slot running at Gen 4 / Gen 5 speeds with an unstable riser cable",
+      "Dying NVMe drive controller or bad motherboard PCIe lane"
+    ],
+    "remediationSteps": [
+      "Reseat the graphics card: Push it firmly into the slot and screw in the bracket tightly.",
+      "Riser cable troubleshooting: If you are using a vertical GPU riser cable, enter BIOS and change PCIe speed from 'Auto/Gen 4' to 'Gen 3' to test signal stability.",
+      "Reseat NVMe SSD: Reinsert the M.2 SSD into its slot and fasten the standoff screw.",
+      "Update Motherboard BIOS to improve PCIe signal integrity microcode."
+    ]
+  },
+  "Event_37_Throttling": {
+    "title": "CPU Speed Limited by System Firmware (Thermal/Power Throttle)",
+    "category": "thermal",
+    "severity": "warning",
+    "description": "The operating system detected that the CPU clock speed was clamped by motherboard firmware (Event 37). This typically happens when the CPU exceeds thermal thresholds or VRMs overheat.",
+    "likelyCauses": [
+      "CPU thermal throttling due to insufficient cooling (dry thermal paste, failed pump, clogged dust filters)",
+      "Motherboard VRM (Voltage Regulator Module) overheating under sustained high wattage",
+      "Laptop or small-form-factor thermal constraint"
+    ],
+    "remediationSteps": [
+      "Check CPU cooler: If you have an All-In-One (AIO) liquid cooler, verify the pump is running and listen for water flow or gurgling.",
+      "Clean dust filters and heatsinks: Clear dust buildup from intake fans, radiator fins, and laptop vents.",
+      "Reapply thermal paste: If the PC is more than 2-3 years old, dried thermal compound can cause 20°C+ temperature spikes.",
+      "Check fan curves: Use BIOS or fan control software to ensure fans ramp up before CPU reaches 80°C."
+    ]
+  },
+  "Event_2004_OOM": {
+    "title": "System Ran Out of Virtual Memory (Resource Exhaustion)",
+    "category": "memory",
+    "severity": "warning",
+    "description": "Windows successfully detected a low virtual memory condition (Event 2004). Applications may crash, fail to allocate memory, or close abruptly.",
+    "likelyCauses": [
+      "A background application has a severe memory leak (consuming gigabytes continuously)",
+      "Windows pagefile is disabled or manually set too small for the active workload",
+      "Too many heavy browser tabs, games, or development tools open concurrently"
+    ],
+    "remediationSteps": [
+      "Inspect the offending process listed in the technical details to identify which program leaked memory.",
+      "Verify pagefile settings: Press Win+R, run `sysdm.cpl`, click Advanced -> Performance Settings -> Advanced -> Virtual Memory -> Ensure 'Automatically manage paging file size for all drives' is checked.",
+      "Consider upgrading physical RAM if your regular workloads consistently exceed capacity."
+    ]
+  },
+  "Event_Storage_Error": {
+    "title": "Storage Controller / Disk I/O Retry Event",
+    "category": "storage",
+    "severity": "critical",
+    "description": "Windows had to retry a read/write operation to a physical storage drive or reset the storage controller.",
+    "likelyCauses": [
+      "Dying SSD or hard drive with failing flash NAND or degraded platter sectors",
+      "Loose SATA data or power cable on 2.5\"/3.5\" drives",
+      "NVMe SSD overheating in its M.2 slot and dropping offline"
+    ],
+    "remediationSteps": [
+      "Back up critical personal files immediately before troubleshooting.",
+      "Inspect drive SMART health status in the Storage section of this app.",
+      "Check physical cables: If SATA, replace the SATA data cable and plug into a different motherboard SATA port.",
+      "Check NVMe thermal pad: Ensure M.2 heatsink is properly mounted to avoid thermal throttling shutdowns."
+    ]
+  },
+  "Event_1000_AppCrash": {
+    "title": "Application Crashed to Desktop (Event 1000)",
+    "category": "app",
+    "severity": "info",
+    "description": "An application encountered an unhandled exception and was terminated by Windows.",
+    "likelyCauses": [
+      "Bug or corrupted file within the application",
+      "Conflicting overlay software (Discord overlay, RivaTuner, GeForce Experience, MSI Afterburner)",
+      "Corrupted DirectX or Visual C++ Redistributable runtime libraries"
+    ],
+    "remediationSteps": [
+      "Review the faulting module in the technical details to pinpoint the source (e.g., `d3d11.dll`, `vcruntime140.dll`).",
+      "Disable third-party in-game overlays (Discord, Steam, Xbox Game Bar) to test stability.",
+      "Reinstall the Microsoft Visual C++ All-In-One Redistributable packages.",
+      "Verify integrity of application files or reinstall the affected software."
+    ]
+  }
+}
