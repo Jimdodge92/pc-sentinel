@@ -1,0 +1,4 @@
+=================================================
+ PC Sentinel Autonomous Server Active
+ Local Dashboard: http://localhost:3500
+=================================================

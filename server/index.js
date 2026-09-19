@@ -144,11 +144,22 @@ app.get('/api/diagnostics', async (req, res) => {
   }
 });
 
-// Start Express Server
+// Serve compiled React frontend directly
+const clientDistPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientDistPath));
+
+// Fallback all non-API routes to index.html for React SPA
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'Endpoint not found' });
+  }
+  res.sendFile(path.join(clientDistPath, 'index.html'));
+});
+
+// Start Express Server (Dual-stack IPv4/IPv6)
 app.listen(PORT, () => {
   console.log(`=================================================`);
-  console.log(` PC Sentinel Diagnostic Server Active`);
-  console.log(` Listening on: http://localhost:${PORT}`);
-  console.log(` Diagnostics API: http://localhost:${PORT}/api/diagnostics`);
+  console.log(` PC Sentinel Autonomous Server Active`);
+  console.log(` Local Dashboard: http://localhost:${PORT}`);
   console.log(`=================================================`);
 });
