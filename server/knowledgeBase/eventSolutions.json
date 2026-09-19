@@ -1,4 +1,24 @@
 {
+  "Event_86_CriticalThermal": {
+    "title": "Emergency Thermal Shutdown (ACPI Critical Temperature Exceeded)",
+    "category": "thermal",
+    "severity": "critical",
+    "description": "Windows executed an emergency protective shutdown because the processor temperature reached the critical safety limit in the ACPI thermal zone. To protect the CPU and motherboard from permanent silicon damage, the kernel immediately instructed shutdown.exe to safely shut down the system.",
+    "likelyCauses": [
+      "Thermal paste dried out, aged, or poorly applied between the CPU and heatsink",
+      "Cooling fan stalled, clogged with dust lint, or failing bearing",
+      "Laptop used on a soft surface (bed, blanket, lap) blocking bottom intake vents",
+      "Heatsink fins clogged with dust preventing heat dissipation",
+      "Intense sustained workload (rendering, gaming, compiling) exceeding thermal limits"
+    ],
+    "remediationSteps": [
+      "Surface placement: Always use the PC/laptop on a hard, flat surface or cooling pad to ensure bottom vents have unobstructed airflow.",
+      "Clear dust buildup: Use compressed air to blow out dust from intake vents and exhaust fins.",
+      "Check fan operation: Listen and feel for airflow to verify the cooling fan spins up aggressively under CPU load.",
+      "Reapply thermal paste: If the PC or laptop is more than 2 years old, dried factory thermal paste can cause 20°C+ thermal spikes. Cleaning and applying quality paste (e.g. Arctic MX-6 or Noctua NT-H2) will dramatically lower temps.",
+      "Inspect background CPU load: Open Task Manager to verify a runaway background app is not holding the CPU at 100% capacity."
+    ]
+  },
   "Event_41_HardPowerLoss": {
     "title": "Abrupt Power Loss Without Blue Screen (Event 41)",
     "category": "power",

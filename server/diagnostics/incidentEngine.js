@@ -12,10 +12,48 @@ function normalizeBugcheckHex(code) {
 }
 
 /**
+ * Helper to parse temperature and ACPI zone from Event 86/88 messages
+ */
+function parseThermalDetails(message = '') {
+  let tempKelvin = null;
+  let tempCelsius = null;
+  let tempFahrenheit = null;
+  let thermalZone = 'ACPI Thermal Zone';
+
+  const crtMatch = message.match(/_CRT\s*=\s*(\d+)K?/i);
+  if (crtMatch) {
+    tempKelvin = parseInt(crtMatch[1], 10);
+    tempCelsius = Math.round(tempKelvin - 273.15);
+    tempFahrenheit = Math.round((tempCelsius * 9/5) + 32);
+  }
+
+  const zoneMatch = message.match(/ACPI Thermal Zone\s*=\s*([^\r\n]+)/i);
+  if (zoneMatch) {
+    thermalZone = zoneMatch[1].trim();
+  }
+
+  return { tempKelvin, tempCelsius, tempFahrenheit, thermalZone };
+}
+
+/**
  * Main analysis function that ingests raw telemetry and produces plain-English diagnoses
  */
 function analyzeDiagnostics(events = [], deviceStatus = {}, storageData = {}, systemSummary = {}) {
   const incidents = [];
+
+  // 0. Pre-index all Critical Thermal Events for multi-event correlation
+  const thermalShutdowns = [];
+  if (Array.isArray(events)) {
+    for (const evt of events) {
+      if ((evt.Id === 86 || evt.Id === 88) && (evt.ProviderName || '').includes('Kernel-Power')) {
+        thermalShutdowns.push({
+          time: new Date(evt.TimeCreated).getTime(),
+          event: evt,
+          ...parseThermalDetails(evt.Message)
+        });
+      }
+    }
+  }
 
   // 1. Process Windows System and Application Events
   if (Array.isArray(events)) {
@@ -99,24 +137,90 @@ function analyzeDiagnostics(events = [], deviceStatus = {}, storageData = {}, sy
         });
       }
 
-      // Event 1074: Graceful / Planned Shutdown
-      else if (id === 1074) {
-        let reason = 'User or System Initiated';
-        if (message.includes('restart')) reason = 'Clean System Restart';
-        if (message.includes('power off') || message.includes('shutdown')) reason = 'Clean Power Off';
-        if (message.includes('WindowsUpdate') || message.includes('Update')) reason = 'Windows Update Restart';
+      // Event 86 / 88: Critical Thermal Emergency Shutdown or Hibernate
+      else if ((id === 86 || id === 88) && provider.includes('Kernel-Power')) {
+        const { tempKelvin, tempCelsius, tempFahrenheit, thermalZone } = parseThermalDetails(message);
+        const tempFormatted = tempCelsius ? `${tempCelsius}°C / ${tempFahrenheit}°F` : 'Critical Temperature';
 
         incidents.push({
-          id: `evt-1074-${timestamp}`,
+          id: `evt-thermal-shutdown-${timestamp}`,
           timestamp,
-          category: 'power',
-          severity: 'info',
-          title: `${eventSolutions.Event_1074.title}: ${reason}`,
-          description: message || eventSolutions.Event_1074.description,
-          likelyCauses: eventSolutions.Event_1074.likelyCauses,
-          remediationSteps: eventSolutions.Event_1074.remediationSteps,
-          technicalDetails: { eventId: id, provider, rawMessage: message }
+          category: 'thermal',
+          severity: 'critical',
+          title: `🚨 Emergency Thermal Shutdown (ACPI Trip: ${tempFormatted})`,
+          description: `Windows executed an emergency thermal shutdown at ${new Date(timestamp).toLocaleTimeString()} because the CPU reached its critical thermal trip point (${tempFormatted}, _CRT: ${tempKelvin}K) in thermal zone '${thermalZone}'. To protect the physical processor and motherboard from permanent silicon damage, the kernel immediately instructed shutdown.exe to safely shut down the system.`,
+          likelyCauses: eventSolutions.Event_86_CriticalThermal.likelyCauses,
+          remediationSteps: eventSolutions.Event_86_CriticalThermal.remediationSteps,
+          technicalDetails: {
+            eventId: id,
+            provider,
+            thermalZone,
+            criticalTempKelvin: tempKelvin,
+            criticalTempCelsius: tempCelsius,
+            criticalTempFahrenheit: tempFahrenheit,
+            rawMessage: message
+          }
         });
+      }
+
+      // Event 1074: Shutdown / Restart Analysis & Correlation
+      else if (id === 1074) {
+        const evtTime = new Date(timestamp).getTime();
+        // Check if there was an emergency thermal shutdown within 120 seconds of this 1074
+        const correlatedThermal = thermalShutdowns.find(t => Math.abs(t.time - evtTime) < 120000);
+
+        if (correlatedThermal) {
+          // Suppress the misleading "Normal / Planned System Shutdown" label because this 1074
+          // was triggered by shutdown.exe on behalf of the critical thermal safety mechanism!
+          continue;
+        }
+
+        const isLocalService = message.includes('NT AUTHORITY\\LOCAL SERVICE') || message.includes('NT AUTHORITY\\SYSTEM');
+        const isUpdate = message.includes('WindowsUpdate') || message.includes('Update');
+
+        if (isUpdate) {
+          incidents.push({
+            id: `evt-1074-${timestamp}`,
+            timestamp,
+            category: 'power',
+            severity: 'info',
+            title: `Windows Update Automated Restart`,
+            description: `Windows initiated a scheduled restart to complete installing system software updates.`,
+            likelyCauses: ['Windows Update completed package installation'],
+            remediationSteps: ['No action required. This was a healthy update reboot.'],
+            technicalDetails: { eventId: id, provider, rawMessage: message }
+          });
+        } else if (isLocalService) {
+          incidents.push({
+            id: `evt-1074-${timestamp}`,
+            timestamp,
+            category: 'power',
+            severity: 'warning',
+            title: `Automated System Shutdown (Local Service / System)`,
+            description: `A background system service or automated script executed shutdown.exe. (Not clicked by user).`,
+            likelyCauses: [
+              'System maintenance task or background service trigger',
+              'Low battery shutdown or ACPI hardware signal'
+            ],
+            remediationSteps: [
+              'Review coinciding logs around this timestamp to see which service requested shutdown.'
+            ],
+            technicalDetails: { eventId: id, provider, rawMessage: message }
+          });
+        } else {
+          let reason = message.includes('restart') ? 'Clean Restart' : 'Clean Power Off';
+          incidents.push({
+            id: `evt-1074-${timestamp}`,
+            timestamp,
+            category: 'power',
+            severity: 'info',
+            title: `User-Initiated Planned Shutdown: ${reason}`,
+            description: message || eventSolutions.Event_1074.description,
+            likelyCauses: eventSolutions.Event_1074.likelyCauses,
+            remediationSteps: eventSolutions.Event_1074.remediationSteps,
+            technicalDetails: { eventId: id, provider, rawMessage: message }
+          });
+        }
       }
 
       // Event 4101: Display Driver Stopped Responding (TDR)

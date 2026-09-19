@@ -9,7 +9,8 @@ $startDate = (Get-Date).AddDays(-$Days)
 # Target Event IDs across key providers
 $targetEvents = @(
     # Shutdowns & Power
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Power'; Id = @(41, 107) },
+    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Power'; Id = @(41, 86, 88, 107, 109) },
+    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Acpi'; Id = @(12, 13) },
     @{ LogName = 'System'; ProviderName = 'EventLog'; Id = @(6008) },
     @{ LogName = 'System'; ProviderName = 'User32'; Id = @(1074) },
     # Blue Screens & Hardware
