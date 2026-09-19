@@ -6,8 +6,17 @@ $proc = Get-CimInstance -ClassName Win32_Processor | Select-Object -First 1
 $gpus = Get-CimInstance -ClassName Win32_VideoController | Select-Object -ExpandProperty Name
 $uptime = (Get-Date) - $os.LastBootUpTime
 
+$chassis = Get-CimInstance -ClassName Win32_SystemEnclosure | Select-Object -First 1
+$isLaptop = ($cs.PCSystemType -eq 2) -or ($cs.Model -match 'ThinkPad|Laptop|Notebook|Book') -or ($chassis.ChassisTypes -contains 9 -or $chassis.ChassisTypes -contains 10 -or $chassis.ChassisTypes -contains 14)
+$formFactor = if ($isLaptop) { "Laptop / Notebook" } else { "Desktop PC" }
+
 [PSCustomObject]@{
     ComputerName = $cs.DNSHostName
+    Manufacturer = $cs.Manufacturer
+    Model = $cs.Model
+    SystemFamily = $cs.SystemFamily
+    FormFactor = $formFactor
+    IsLaptop = $isLaptop
     OS = $os.Caption
     OSVersion = $os.Version
     OSBuild = $os.BuildNumber

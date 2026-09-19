@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle, Monitor, Cpu, Clock } from 'lucide-react';
+import { Activity, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle, Monitor, Cpu, Clock, Laptop } from 'lucide-react';
 
 export default function StatusHeader({ overallHealth, systemSummary, loading, onRefresh, lastScanTime }) {
   const getStatusBadge = () => {
@@ -57,20 +57,20 @@ export default function StatusHeader({ overallHealth, systemSummary, loading, on
         {/* System Quick Specs & Scan Button */}
         <div className="flex items-center flex-wrap gap-3 w-full md:w-auto justify-between md:justify-end">
           {systemSummary && (
-            <div className="hidden lg:flex items-center gap-4 text-xs text-slate-300 bg-slate-900/80 px-3.5 py-2 rounded-lg border border-slate-800">
+            <div className="hidden lg:flex items-center gap-3.5 text-xs text-slate-300 bg-slate-900/80 px-3.5 py-2 rounded-lg border border-slate-800">
+              <div className="flex items-center gap-1.5 text-cyan-300 font-semibold" title={`${systemSummary.Manufacturer || ''} ${systemSummary.Model || ''}`}>
+                <Laptop className="w-3.5 h-3.5 text-cyan-400" />
+                <span>{systemSummary.SystemFamily || systemSummary.Model || 'ThinkPad'}</span>
+              </div>
+              <div className="w-px h-3 bg-slate-700" />
               <div className="flex items-center gap-1.5" title={systemSummary.Processor}>
-                <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="font-mono truncate max-w-[140px]">{systemSummary.Processor?.split('@')[0] || 'CPU'}</span>
+                <Cpu className="w-3.5 h-3.5 text-blue-400" />
+                <span className="font-mono truncate max-w-[130px]">{systemSummary.Processor?.split('@')[0] || 'CPU'}</span>
               </div>
               <div className="w-px h-3 bg-slate-700" />
               <div className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-blue-400" />
+                <Clock className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Up: {systemSummary.UptimeHours || 0}h</span>
-              </div>
-              <div className="w-px h-3 bg-slate-700" />
-              <div className="flex items-center gap-1.5">
-                <Monitor className="w-3.5 h-3.5 text-indigo-400" />
-                <span className="font-mono">{systemSummary.ComputerName || 'PC'}</span>
               </div>
             </div>
           )}

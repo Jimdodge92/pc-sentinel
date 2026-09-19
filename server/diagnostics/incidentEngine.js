@@ -36,6 +36,67 @@ function parseThermalDetails(message = '') {
 }
 
 /**
+ * Generates hardware-contextual thermal diagnoses and remediations
+ * Differentiates between Laptops/ThinkPads and Desktop Towers
+ */
+function getHardwareThermalProfile(systemSummary = {}, isEmergencyShutdown = false, tempFormatted = '', tempKelvin = '', thermalZone = '') {
+  const isLaptop = systemSummary?.IsLaptop ||
+                   (systemSummary?.Model || '').toLowerCase().includes('thinkpad') ||
+                   (systemSummary?.SystemFamily || '').toLowerCase().includes('thinkpad') ||
+                   (systemSummary?.FormFactor || '').toLowerCase().includes('laptop');
+
+  const model = systemSummary?.SystemFamily || systemSummary?.Model ?
+    `${systemSummary.Manufacturer || ''} ${systemSummary.SystemFamily || systemSummary.Model}`.trim() :
+    (isLaptop ? 'ThinkPad Laptop' : 'Desktop PC');
+
+  if (isLaptop) {
+    return {
+      title: isEmergencyShutdown
+        ? `🚨 Emergency Thermal Shutdown (${model}: ${tempFormatted})`
+        : `CPU Thermal Throttling (${model})`,
+      description: isEmergencyShutdown
+        ? `Windows executed an emergency protective shutdown because the processor reached its critical safety threshold (${tempFormatted}, _CRT: ${tempKelvin}K) in thermal zone '${thermalZone}'. Because this ${model} relies on a compact internal copper heatpipe and underside intake, heat accumulation under sustained load reached the hardware thermal limit, forcing the system to shut down to prevent silicon damage.`
+        : `The system firmware on your ${model} clamped CPU clock speeds to reduce thermal output. Because this laptop uses bottom intake vents with minimal (~1.5mm) desk clearance, heat quickly builds up during intensive tasks.`,
+      likelyCauses: [
+        `Under-chassis desk ventilation: On this ${model}, cool air is pulled directly through the bottom intake grill. When resting completely flat on a desk, the ~1.5mm rubber feet provide very little intake clearance, causing heat trapping and thermal recirculation under sustained CPU load.`,
+        `Compact laptop thermal saturation: Unlike full-sized desktop towers, thin-and-light laptops have compact copper heatpipes and a single centrifugal blower fan with limited heat dissipation surface area.`,
+        `Fine dust/lint in exhaust grill: Dust or lint trapped across the narrow internal copper radiator fins restricts warm air expulsion from the side/rear exhaust.`,
+        `Power mode / Intel Dynamic Tuning: Windows or Lenovo Vantage power slider set to 'Best Performance' on AC power while ambient desk airflow is constrained.`
+      ],
+      remediationSteps: [
+        `Elevate the rear of your ${model}: Prop up the back rubber feet by 0.5–1 inch (using small rubber risers or an angled laptop stand). Raising the bottom intake vents off the desk surface immediately drops peak CPU temperatures by 8°C–15°C.`,
+        `Maintain a hard, flat desk surface: Avoid resting the laptop on soft surfaces (beds, blankets, couches, or laps) during heavy workloads, which completely suffocates the bottom intake vents.`,
+        `Clear blower fan & exhaust grill: Blow short bursts of compressed air into the exhaust and intake grills to clear any trapped lint on the internal copper radiator fins.`,
+        `Adjust Windows / Lenovo Power Slider: Click the battery icon in the Windows taskbar and select 'Balanced' or 'Intelligent Cooling' to allow fan curves to react earlier before temperatures spike.`,
+        `Open display lid when docked: If using an external monitor/dock with the laptop lid closed, open the display—ThinkPads dissipate significant ambient heat upward through the keyboard deck.`
+      ]
+    };
+  }
+
+  // Desktop Tower Profile (Case fans, AIO coolers, tower heatsinks)
+  return {
+    title: isEmergencyShutdown
+      ? `🚨 Emergency Thermal Shutdown (Desktop PC: ${tempFormatted})`
+      : `CPU Speed Limited by System Firmware (Thermal/Power Throttle)`,
+    description: isEmergencyShutdown
+      ? `Windows executed an emergency protective shutdown because the desktop CPU reached its critical thermal trip point (${tempFormatted}, _CRT: ${tempKelvin}K) in thermal zone '${thermalZone}'.`
+      : `The operating system detected that CPU clock speeds were restricted by motherboard firmware due to thermal limits or VRM power envelope clamps.`,
+    likelyCauses: [
+      "Case airflow restriction: Dust filters clogged, or intake fans not pulling sufficient cool air into the desktop chassis.",
+      "CPU cooler malfunction: AIO liquid cooler pump stalled, fan header loose, or cooler mounting bracket unseated.",
+      "Thermal paste degradation: Thermal compound between CPU and heatsink has dried out (>2-3 years old).",
+      "GPU exhaust heat recirculating directly into the CPU heatsink inside a compact PC case."
+    ],
+    remediationSteps: [
+      "Clean dust filters: Remove and vacuum or wash the front mesh and bottom PSU intake dust filters.",
+      "Check CPU cooler & pump: If using an AIO liquid cooler, verify the pump tachometer in BIOS/software and listen for water flow.",
+      "Reapply thermal paste: Clean old paste with 99% isopropyl alcohol and apply fresh high-performance thermal compound.",
+      "Verify chassis fan curve: Ensure case intake and exhaust fans ramp up as CPU temperature exceeds 65°C."
+    ]
+  };
+}
+
+/**
  * Main analysis function that ingests raw telemetry and produces plain-English diagnoses
  */
 function analyzeDiagnostics(events = [], deviceStatus = {}, storageData = {}, systemSummary = {}) {
@@ -141,16 +202,17 @@ function analyzeDiagnostics(events = [], deviceStatus = {}, storageData = {}, sy
       else if ((id === 86 || id === 88) && provider.includes('Kernel-Power')) {
         const { tempKelvin, tempCelsius, tempFahrenheit, thermalZone } = parseThermalDetails(message);
         const tempFormatted = tempCelsius ? `${tempCelsius}°C / ${tempFahrenheit}°F` : 'Critical Temperature';
+        const profile = getHardwareThermalProfile(systemSummary, true, tempFormatted, tempKelvin, thermalZone);
 
         incidents.push({
           id: `evt-thermal-shutdown-${timestamp}`,
           timestamp,
           category: 'thermal',
           severity: 'critical',
-          title: `🚨 Emergency Thermal Shutdown (ACPI Trip: ${tempFormatted})`,
-          description: `Windows executed an emergency thermal shutdown at ${new Date(timestamp).toLocaleTimeString()} because the CPU reached its critical thermal trip point (${tempFormatted}, _CRT: ${tempKelvin}K) in thermal zone '${thermalZone}'. To protect the physical processor and motherboard from permanent silicon damage, the kernel immediately instructed shutdown.exe to safely shut down the system.`,
-          likelyCauses: eventSolutions.Event_86_CriticalThermal.likelyCauses,
-          remediationSteps: eventSolutions.Event_86_CriticalThermal.remediationSteps,
+          title: profile.title,
+          description: profile.description,
+          likelyCauses: profile.likelyCauses,
+          remediationSteps: profile.remediationSteps,
           technicalDetails: {
             eventId: id,
             provider,
@@ -255,15 +317,17 @@ function analyzeDiagnostics(events = [], deviceStatus = {}, storageData = {}, sy
 
       // Event 37: CPU Thermal / Power Throttling
       else if (id === 37 && provider.includes('Kernel-Processor-Power')) {
+        const profile = getHardwareThermalProfile(systemSummary, false);
+
         incidents.push({
           id: `evt-37-${timestamp}`,
           timestamp,
           category: 'thermal',
           severity: 'warning',
-          title: eventSolutions.Event_37_Throttling.title,
-          description: message || eventSolutions.Event_37_Throttling.description,
-          likelyCauses: eventSolutions.Event_37_Throttling.likelyCauses,
-          remediationSteps: eventSolutions.Event_37_Throttling.remediationSteps,
+          title: profile.title,
+          description: profile.description,
+          likelyCauses: profile.likelyCauses,
+          remediationSteps: profile.remediationSteps,
           technicalDetails: { eventId: id, provider, rawMessage: message }
         });
       }
