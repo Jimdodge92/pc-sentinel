@@ -4,9 +4,10 @@ import MetricsBar from './components/MetricsBar';
 import IncidentCard from './components/IncidentCard';
 import DiagnosisModal from './components/DiagnosisModal';
 import HardwareStatusCard from './components/HardwareStatusCard';
+import RemoteAccessModal from './components/RemoteAccessModal';
 import {
   Search, Filter, CheckCircle2, AlertCircle, ShieldAlert,
-  Power, Monitor, HardDrive, Cpu, FileText, Calendar
+  Power, Monitor, HardDrive, Cpu, FileText, Calendar, Lock, Key, Globe
 } from 'lucide-react';
 
 export default function App() {
@@ -15,22 +16,59 @@ export default function App() {
   const [error, setError] = useState(null);
   const [selectedIncident, setSelectedIncident] = useState(null);
 
+  // Network & Remote Access State
+  const [networkInfo, setNetworkInfo] = useState(null);
+  const [isRemoteModalOpen, setIsRemoteModalOpen] = useState(false);
+
+  // Security PIN State
+  const [userPin, setUserPin] = useState(() => localStorage.getItem('pc_sentinel_pin') || '');
+  const [pinRequired, setPinRequired] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState(null);
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+
   // Filters
   const [activeCategory, setActiveCategory] = useState('all');
   const [severityFilter, setSeverityFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [daysFilter, setDaysFilter] = useState(14);
 
-  const fetchDiagnostics = async (forceRefresh = false) => {
+  const fetchNetworkInfo = async () => {
+    try {
+      const res = await fetch('/api/network-info');
+      if (res.ok) {
+        const json = await res.json();
+        setNetworkInfo(json);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch network info:', e);
+    }
+  };
+
+  const fetchDiagnostics = async (forceRefresh = false, activePin = userPin) => {
     try {
       setLoading(true);
       setError(null);
       const url = `/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
-      const res = await fetch(url);
+      const headers = {};
+      if (activePin) {
+        headers['x-sentinel-pin'] = activePin;
+      }
+
+      const res = await fetch(url, { headers });
+
+      if (res.status === 401) {
+        setPinRequired(true);
+        setData(null);
+        return;
+      }
+
       if (!res.ok) {
         throw new Error(`Server returned status ${res.status}`);
       }
+
       const json = await res.json();
+      setPinRequired(false);
       setData(json);
     } catch (err) {
       console.error('Failed to fetch diagnostics:', err);
@@ -41,8 +79,42 @@ export default function App() {
   };
 
   useEffect(() => {
+    fetchNetworkInfo();
+  }, []);
+
+  useEffect(() => {
     fetchDiagnostics();
   }, [daysFilter]);
+
+  const handlePinSubmit = async (e) => {
+    e.preventDefault();
+    if (!pinInput.trim()) return;
+    setIsVerifyingPin(true);
+    setPinError(null);
+
+    try {
+      const res = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pinInput })
+      });
+
+      const resData = await res.json();
+      if (!res.ok || !resData.success) {
+        setPinError(resData.message || 'Incorrect Security PIN. Please try again.');
+        return;
+      }
+
+      localStorage.setItem('pc_sentinel_pin', pinInput);
+      setUserPin(pinInput);
+      setPinRequired(false);
+      fetchDiagnostics(false, pinInput);
+    } catch (err) {
+      setPinError('Failed to verify PIN. Check server connection.');
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
 
   const incidents = data?.incidents || [];
 
@@ -89,26 +161,67 @@ export default function App() {
         loading={loading}
         onRefresh={() => fetchDiagnostics(true)}
         lastScanTime={data?.scanTime}
+        onOpenRemoteAccess={() => setIsRemoteModalOpen(true)}
       />
 
       {/* 2. Main Content Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 w-full mt-6 space-y-6 flex-1">
-        {/* Error Alert */}
-        {error && (
-          <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-center gap-3 text-rose-300 text-sm">
-            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-            <div className="flex-1">
-              <strong>Connection Issue: </strong>
-              <span>{error}</span>
+        {/* PIN Authentication Required Screen */}
+        {pinRequired ? (
+          <div className="max-w-md mx-auto my-12 bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mx-auto">
+              <Lock className="w-7 h-7" />
             </div>
-            <button
-              onClick={() => fetchDiagnostics(true)}
-              className="px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 rounded text-xs font-semibold text-rose-200 border border-rose-500/40"
-            >
-              Retry
-            </button>
+            <div>
+              <h2 className="text-xl font-bold text-white">Security PIN Required</h2>
+              <p className="text-xs text-slate-400 mt-2">
+                This PC Sentinel dashboard is being accessed remotely and is protected by a security PIN. Enter the PIN configured on the host machine to continue.
+              </p>
+            </div>
+
+            {pinError && (
+              <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs p-3 rounded-lg flex items-center gap-2 text-left">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{pinError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handlePinSubmit} className="space-y-4">
+              <input
+                type="password"
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value)}
+                placeholder="Enter PIN"
+                autoFocus
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-center text-lg font-mono tracking-widest text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+              />
+              <button
+                type="submit"
+                disabled={isVerifyingPin}
+                className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-sm transition-all shadow-lg shadow-cyan-500/20 active:scale-95 disabled:opacity-50"
+              >
+                {isVerifyingPin ? 'Verifying...' : 'Unlock Dashboard'}
+              </button>
+            </form>
           </div>
-        )}
+        ) : (
+          <>
+            {/* Error Alert */}
+            {error && (
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-center gap-3 text-rose-300 text-sm">
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                <div className="flex-1">
+                  <strong>Connection Issue: </strong>
+                  <span>{error}</span>
+                </div>
+                <button
+                  onClick={() => fetchDiagnostics(true)}
+                  className="px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 rounded text-xs font-semibold text-rose-200 border border-rose-500/40"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
 
         {/* Telemetry Metrics Bar */}
         <MetricsBar
@@ -226,6 +339,8 @@ export default function App() {
             />
           </div>
         </div>
+          </>
+        )}
       </main>
 
       {/* 4. Full Diagnosis & Fix Modal */}
@@ -233,6 +348,15 @@ export default function App() {
         <DiagnosisModal
           incident={selectedIncident}
           onClose={() => setSelectedIncident(null)}
+        />
+      )}
+
+      {/* 5. Off-Network Remote Access & Port Forwarding Modal */}
+      {isRemoteModalOpen && (
+        <RemoteAccessModal
+          networkInfo={networkInfo}
+          onClose={() => setIsRemoteModalOpen(false)}
+          onUpdateConfig={fetchNetworkInfo}
         />
       )}
     </div>

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Activity, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle, Monitor, Cpu, Clock, Laptop } from 'lucide-react';
+import { Activity, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle, Monitor, Cpu, Clock, Laptop, Globe } from 'lucide-react';
 
-export default function StatusHeader({ overallHealth, systemSummary, loading, onRefresh, lastScanTime }) {
+export default function StatusHeader({ overallHealth, systemSummary, loading, onRefresh, lastScanTime, onOpenRemoteAccess }) {
   const getStatusBadge = () => {
     if (!overallHealth) return null;
     const status = overallHealth.status;
@@ -74,6 +74,15 @@ export default function StatusHeader({ overallHealth, systemSummary, loading, on
               </div>
             </div>
           )}
+
+          <button
+            onClick={onOpenRemoteAccess}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-lg font-medium text-xs tracking-wide bg-slate-800/80 hover:bg-slate-700/80 text-cyan-300 border border-cyan-500/30 transition-all active:scale-95 shadow-sm"
+            title="Configure Off-Network Access & Port Forwarding"
+          >
+            <Globe className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Remote Access</span>
+          </button>
 
           <button
             onClick={onRefresh}

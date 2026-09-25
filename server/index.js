@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const { execFile } = require('child_process');
 const { analyzeDiagnostics } = require('./diagnostics/incidentEngine');
 
@@ -9,6 +11,103 @@ const PORT = process.env.PORT || 3500;
 
 app.use(cors());
 app.use(express.json());
+
+// Configuration path & helpers
+const CONFIG_FILE = path.join(__dirname, 'config.json');
+
+function loadConfig() {
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    }
+  } catch (e) {
+    console.error('Error loading config:', e.message);
+  }
+  return { pin: '', allowLocalBypass: true };
+}
+
+function saveConfig(cfg) {
+  try {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    console.error('Error saving config:', e.message);
+    return false;
+  }
+}
+
+/**
+ * Get primary local LAN IPv4 address (e.g. 192.168.4.39)
+ */
+function getLocalIp() {
+  const nets = os.networkInterfaces();
+  let fallback = '127.0.0.1';
+
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        if (!net.address.startsWith('169.254')) {
+          return net.address;
+        }
+        fallback = net.address;
+      }
+    }
+  }
+  return fallback;
+}
+
+/**
+ * Cache for public IP
+ */
+let cachedPublicIp = null;
+let lastPublicIpCheck = 0;
+
+async function getPublicIp() {
+  const now = Date.now();
+  if (cachedPublicIp && (now - lastPublicIpCheck < 300000)) { // 5 min cache
+    return cachedPublicIp;
+  }
+
+  try {
+    const res = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
+    if (res.ok) {
+      const data = await res.json();
+      cachedPublicIp = data.ip;
+      lastPublicIpCheck = now;
+      return cachedPublicIp;
+    }
+  } catch (e) {
+    // Return cached or null
+  }
+  return cachedPublicIp || null;
+}
+
+/**
+ * Check if request originates from localhost
+ */
+function isLocalRequest(req) {
+  const ip = req.ip || req.connection?.remoteAddress || '';
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip.includes('localhost');
+}
+
+/**
+ * Security PIN verification middleware for remote/off-network requests
+ */
+function requirePinIfRemote(req, res, next) {
+  const config = loadConfig();
+  if (!config.pin) return next(); // No PIN configured
+
+  if (config.allowLocalBypass && isLocalRequest(req)) {
+    return next(); // Localhost on same PC is exempt
+  }
+
+  const clientPin = req.headers['x-sentinel-pin'] || req.query.pin;
+  if (clientPin && clientPin.trim() === config.pin.trim()) {
+    return next();
+  }
+
+  return res.status(401).json({ error: 'PIN_REQUIRED', message: 'Valid security PIN required for off-network remote access.' });
+}
 
 // Path to powershell scripts
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
@@ -64,9 +163,84 @@ app.get('/api/health', (req, res) => {
 });
 
 /**
+ * Network configuration and remote access info
+ */
+app.get('/api/network-info', async (req, res) => {
+  try {
+    const config = loadConfig();
+    const localIp = getLocalIp();
+    const publicIp = await getPublicIp();
+    const isLocal = isLocalRequest(req);
+
+    res.json({
+      localIp,
+      publicIp,
+      port: PORT,
+      hasPin: !!(config.pin && config.pin.trim().length > 0),
+      allowLocalBypass: config.allowLocalBypass !== false,
+      isLocalRequest: isLocal
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Verify Security PIN
+ */
+app.post('/api/auth/verify', (req, res) => {
+  const { pin } = req.body || {};
+  const config = loadConfig();
+
+  if (!config.pin || config.pin.trim().length === 0) {
+    return res.json({ success: true, message: 'No PIN configured' });
+  }
+
+  if (pin && pin.trim() === config.pin.trim()) {
+    return res.json({ success: true, message: 'PIN authenticated' });
+  }
+
+  return res.status(401).json({ success: false, error: 'INVALID_PIN', message: 'Incorrect PIN provided.' });
+});
+
+/**
+ * Update Security PIN and settings
+ */
+app.post('/api/auth/set-pin', (req, res) => {
+  const { currentPin, newPin, allowLocalBypass } = req.body || {};
+  const config = loadConfig();
+  const isLocal = isLocalRequest(req);
+
+  // If a PIN is currently active and request is not local, require current PIN
+  if (config.pin && !isLocal) {
+    if (!currentPin || currentPin.trim() !== config.pin.trim()) {
+      return res.status(403).json({ error: 'Current PIN required to change settings remotely.' });
+    }
+  }
+
+  if (typeof newPin === 'string') {
+    config.pin = newPin.trim();
+  }
+  if (typeof allowLocalBypass === 'boolean') {
+    config.allowLocalBypass = allowLocalBypass;
+  }
+
+  const saved = saveConfig(config);
+  if (!saved) {
+    return res.status(500).json({ error: 'Failed to save configuration.' });
+  }
+
+  res.json({
+    success: true,
+    hasPin: !!(config.pin && config.pin.trim().length > 0),
+    allowLocalBypass: config.allowLocalBypass
+  });
+});
+
+/**
  * System hardware summary (CPU, RAM, OS, Uptime)
  */
-app.get('/api/system-summary', async (req, res) => {
+app.get('/api/system-summary', requirePinIfRemote, async (req, res) => {
   try {
     const summary = await runPowerShellScript('get-system-summary.ps1');
     res.json(summary || {});
@@ -78,7 +252,7 @@ app.get('/api/system-summary', async (req, res) => {
 /**
  * Device and GPU status (including Problem Codes 43, 45, etc.)
  */
-app.get('/api/device-status', async (req, res) => {
+app.get('/api/device-status', requirePinIfRemote, async (req, res) => {
   try {
     const status = await runPowerShellScript('get-device-status.ps1');
     res.json(status || {});
@@ -90,7 +264,7 @@ app.get('/api/device-status', async (req, res) => {
 /**
  * Storage health and SMART metrics
  */
-app.get('/api/storage-health', async (req, res) => {
+app.get('/api/storage-health', requirePinIfRemote, async (req, res) => {
   try {
     const storage = await runPowerShellScript('get-storage-reliability.ps1');
     res.json(storage || {});
@@ -103,7 +277,7 @@ app.get('/api/storage-health', async (req, res) => {
  * Full Diagnostics Endpoint
  * Collects events, hardware, and storage, runs the diagnostic engine, and returns plain-English results.
  */
-app.get('/api/diagnostics', async (req, res) => {
+app.get('/api/diagnostics', requirePinIfRemote, async (req, res) => {
   const forceRefresh = req.query.refresh === 'true';
   const days = parseInt(req.query.days, 10) || 14;
 
