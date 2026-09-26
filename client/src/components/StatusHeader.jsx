@@ -1,7 +1,7 @@
 import React from 'react';
-import { Activity, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle, Monitor, Cpu, Clock, Laptop, Globe, Smartphone } from 'lucide-react';
+import { Activity, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle, Monitor, Cpu, Clock, Laptop, Globe, Smartphone, ChevronRight } from 'lucide-react';
 
-export default function StatusHeader({ overallHealth, systemSummary, loading, onRefresh, lastScanTime, onOpenRemoteAccess, isOffline }) {
+export default function StatusHeader({ overallHealth, systemSummary, loading, onRefresh, lastScanTime, onOpenRemoteAccess, isOffline, onJumpToIncident }) {
   const getStatusBadge = () => {
     if (isOffline) {
       return (
@@ -17,18 +17,30 @@ export default function StatusHeader({ overallHealth, systemSummary, loading, on
 
     if (status === 'critical') {
       return (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-medium text-sm">
-          <ShieldAlert className="w-4 h-4 text-rose-400 animate-pulse" />
-          <span>{overallHealth.label || 'Attention Needed'}</span>
-        </div>
+        <button
+          onClick={onJumpToIncident}
+          className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 hover:border-rose-400 text-rose-300 hover:text-white font-semibold text-xs sm:text-sm transition-all active:scale-95 shadow-sm group cursor-pointer"
+          title="Click to jump directly to the latest critical incident"
+        >
+          <ShieldAlert className="w-4 h-4 text-rose-400 animate-pulse group-hover:scale-110 transition-transform" />
+          <span>{overallHealth.label || 'Action Needed'}</span>
+          <span className="text-[10px] bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-800/80 text-rose-200">View</span>
+          <ChevronRight className="w-3.5 h-3.5 text-rose-400 group-hover:translate-x-0.5 transition-transform" />
+        </button>
       );
     }
     if (status === 'warning') {
       return (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-medium text-sm">
-          <AlertTriangle className="w-4 h-4 text-amber-400" />
-          <span>{overallHealth.label || 'Minor Warnings Detected'}</span>
-        </div>
+        <button
+          onClick={onJumpToIncident}
+          className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 hover:border-amber-400 text-amber-300 hover:text-white font-semibold text-xs sm:text-sm transition-all active:scale-95 shadow-sm group cursor-pointer"
+          title="Click to jump directly to the latest warning"
+        >
+          <AlertTriangle className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+          <span>{overallHealth.label || 'Warnings Detected'}</span>
+          <span className="text-[10px] bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-800/80 text-amber-200">View</span>
+          <ChevronRight className="w-3.5 h-3.5 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
+        </button>
       );
     }
     return (

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ShieldAlert, ShieldCheck, Power, HardDrive, Cpu, AlertTriangle } from 'lucide-react';
 
-export default function MetricsBar({ overallHealth, incidents = [], systemSummary, storageData }) {
+export default function MetricsBar({ overallHealth, incidents = [], systemSummary, storageData, onJumpToIncident }) {
   const criticalCount = incidents.filter(i => i.severity === 'critical').length;
   const warningCount = incidents.filter(i => i.severity === 'warning').length;
   const shutdownCrashes = incidents.filter(i => i.category === 'power' && i.severity === 'critical').length;
@@ -11,13 +11,23 @@ export default function MetricsBar({ overallHealth, incidents = [], systemSummar
   const diskList = Array.isArray(disks) ? disks : (disks && Object.keys(disks).length > 0 ? [disks] : []);
   const storageHealthy = diskList.length > 0 && diskList.every(d => (d.HealthStatus || '').toLowerCase() === 'healthy');
 
+  const isClickable = (overallHealth?.status === 'critical' || overallHealth?.status === 'warning') && !!onJumpToIncident;
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* 1. Health Status Card */}
-      <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between relative overflow-hidden backdrop-blur-sm">
+      <div
+        onClick={isClickable ? onJumpToIncident : undefined}
+        className={`bg-slate-900/60 border rounded-xl p-4 flex flex-col justify-between relative overflow-hidden backdrop-blur-sm transition-all ${
+          isClickable
+            ? 'cursor-pointer hover:bg-slate-900/90 hover:border-rose-500/50 hover:shadow-lg hover:shadow-rose-950/20 active:scale-[0.99] border-slate-800/80 group'
+            : 'border-slate-800/80'
+        }`}
+        title={isClickable ? "Click to view latest incident" : undefined}
+      >
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Health Status</span>
-          <div className={`p-2 rounded-lg ${
+          <div className={`p-2 rounded-lg transition-transform ${isClickable ? 'group-hover:scale-110' : ''} ${
             overallHealth?.status === 'critical' ? 'bg-rose-500/10 text-rose-400' :
             overallHealth?.status === 'warning' ? 'bg-amber-500/10 text-amber-400' :
             'bg-emerald-500/10 text-emerald-400'
@@ -28,7 +38,14 @@ export default function MetricsBar({ overallHealth, incidents = [], systemSummar
           </div>
         </div>
         <div className="mt-3">
-          <h3 className="text-lg font-bold text-white capitalize">{overallHealth?.label || 'Healthy'}</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-white capitalize">{overallHealth?.label || 'Healthy'}</h3>
+            {isClickable && (
+              <span className="text-[11px] font-semibold text-rose-400 group-hover:translate-x-0.5 transition-transform flex items-center">
+                Review &rarr;
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-400 mt-1 line-clamp-1">
             {criticalCount > 0 ? `${criticalCount} critical incident(s) flagged` : `${warningCount} warning(s) logged`}
           </p>

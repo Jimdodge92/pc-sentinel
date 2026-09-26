@@ -231,16 +231,73 @@ export default function App() {
     });
   }, [incidents, activeCategory, severityFilter, searchQuery]);
 
-  // Category counts
+  // Category counts across full spectrum
   const categoryCounts = useMemo(() => {
-    const counts = { all: incidents.length, power: 0, gpu: 0, bsod: 0, thermal: 0, storage: 0, app: 0 };
+    const counts = {
+      all: incidents.length,
+      power: 0,
+      thermal: 0,
+      gpu: 0,
+      hardware: 0,
+      bsod: 0,
+      storage: 0,
+      app: 0,
+      system: 0,
+      network: 0,
+      security: 0
+    };
     for (const inc of incidents) {
       if (counts[inc.category] !== undefined) {
         counts[inc.category]++;
+      } else {
+        counts.system = (counts.system || 0) + 1;
       }
     }
     return counts;
   }, [incidents]);
+
+  // Severity counts
+  const severityCounts = useMemo(() => {
+    return {
+      all: incidents.length,
+      critical: incidents.filter(i => i.severity === 'critical').length,
+      warning: incidents.filter(i => i.severity === 'warning').length,
+      info: incidents.filter(i => i.severity === 'info').length
+    };
+  }, [incidents]);
+
+  // 1-Click Jump to Latest Critical Event or Warning
+  const jumpToLatestIncident = () => {
+    if (!incidents || incidents.length === 0) return;
+
+    // 1. Look for latest critical incident
+    let target = incidents.find(i => i.severity === 'critical');
+
+    // 2. If no critical present, look for latest warning incident
+    if (!target) {
+      target = incidents.find(i => i.severity === 'warning');
+    }
+
+    // 3. Fallback to latest incident of any severity
+    if (!target) {
+      target = incidents[0];
+    }
+
+    if (target) {
+      setSearchQuery('');
+      setActiveCategory('all');
+      setSeverityFilter('all');
+
+      setTimeout(() => {
+        const el = document.getElementById(`incident-${target.id}`) || document.getElementById('incidents-feed');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50);
+
+      setSelectedIncident(target);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white pb-16">
@@ -253,6 +310,7 @@ export default function App() {
         lastScanTime={data?.scanTime}
         onOpenRemoteAccess={() => setIsPairingModalOpen(true)}
         isOffline={isOffline}
+        onJumpToIncident={jumpToLatestIncident}
       />
 
       {/* 2. Main Content Container */}
@@ -349,12 +407,13 @@ export default function App() {
               incidents={incidents}
               systemSummary={data?.systemSummary}
               storageData={data?.storageData}
+              onJumpToIncident={jumpToLatestIncident}
             />
 
             {/* 3. Main Dashboard Layout (2 Columns: Incident Timeline + Hardware Specs) */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left / Main Column: Incidents Feed (2 cols on lg) */}
-              <div className="lg:col-span-2 space-y-4">
+              <div className="lg:col-span-2 space-y-4" id="incidents-feed">
                 {/* Filter & Search Bar */}
                 <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 space-y-3 backdrop-blur-sm">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -365,7 +424,7 @@ export default function App() {
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search crashes, drivers, GPU errors, or symptoms..."
+                        placeholder="Search crashes, events, services, drivers, or symptoms..."
                         className="w-full bg-slate-950/80 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
                       />
                     </div>
@@ -388,17 +447,51 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Category Filter Pills */}
+                  {/* Severity Filter Quick Pills */}
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+                    <div className="flex items-center gap-1.5 text-xs overflow-x-auto">
+                      <span className="text-[11px] text-slate-500 uppercase font-bold tracking-wider mr-1">Severity:</span>
+                      {[
+                        { id: 'all', label: 'All', count: severityCounts.all, color: 'bg-cyan-500 text-slate-950' },
+                        { id: 'critical', label: 'Critical', count: severityCounts.critical, color: 'bg-rose-500 text-white' },
+                        { id: 'warning', label: 'Warnings', count: severityCounts.warning, color: 'bg-amber-500 text-slate-950' },
+                        { id: 'info', label: 'Info Logs', count: severityCounts.info, color: 'bg-blue-500 text-white' }
+                      ].map(sev => (
+                        <button
+                          key={sev.id}
+                          onClick={() => setSeverityFilter(sev.id)}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5 ${
+                            severityFilter === sev.id
+                              ? `${sev.color} shadow-sm font-bold`
+                              : 'bg-slate-950/60 hover:bg-slate-800 text-slate-400 border border-slate-800'
+                          }`}
+                        >
+                          <span>{sev.label}</span>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                            severityFilter === sev.id ? 'bg-black/20' : 'bg-slate-800 text-slate-400'
+                          }`}>
+                            {sev.count}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Category Filter Pills (Full Spectrum) */}
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
                     {[
-                      { id: 'all', label: 'All Incidents', count: categoryCounts.all },
-                      { id: 'power', label: 'Shutdowns', count: categoryCounts.power },
+                      { id: 'all', label: 'All Logs', count: categoryCounts.all },
+                      { id: 'power', label: 'Power & Sleep', count: categoryCounts.power },
+                      { id: 'thermal', label: 'Thermals', count: categoryCounts.thermal },
+                      { id: 'hardware', label: 'Hardware & USB', count: categoryCounts.hardware },
                       { id: 'gpu', label: 'GPU & Display', count: categoryCounts.gpu },
                       { id: 'bsod', label: 'Blue Screens', count: categoryCounts.bsod },
-                      { id: 'thermal', label: 'Thermals', count: categoryCounts.thermal },
                       { id: 'storage', label: 'Storage', count: categoryCounts.storage },
-                      { id: 'app', label: 'App Crashes', count: categoryCounts.app }
-                    ].map(tab => (
+                      { id: 'app', label: 'Applications', count: categoryCounts.app },
+                      { id: 'system', label: 'System & Services', count: categoryCounts.system },
+                      { id: 'network', label: 'Network', count: categoryCounts.network },
+                      { id: 'security', label: 'Security', count: categoryCounts.security }
+                    ].filter(tab => tab.id === 'all' || tab.count > 0).map(tab => (
                       <button
                         key={tab.id}
                         onClick={() => setActiveCategory(tab.id)}

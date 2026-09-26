@@ -386,6 +386,87 @@ function analyzeDiagnostics(events = [], deviceStatus = {}, storageData = {}, sy
           }
         });
       }
+
+      // General / Standard Windows System and Application Logs (Full Spectrum Tracking)
+      else {
+        let category = 'system';
+        const provLower = provider.toLowerCase();
+
+        if (provLower.includes('kernel-power') || provLower.includes('eventlog') || provLower.includes('user32') || provLower.includes('kernel-boot') || provLower.includes('wininit')) {
+          category = 'power';
+        } else if (provLower.includes('wlan') || provLower.includes('net') || provLower.includes('tcpip') || provLower.includes('dhcp') || provLower.includes('dns') || provLower.includes('e1i68x64')) {
+          category = 'network';
+        } else if (provLower.includes('display') || provLower.includes('video') || provLower.includes('gpu') || provLower.includes('directx')) {
+          category = 'gpu';
+        } else if (provLower.includes('disk') || provLower.includes('storahci') || provLower.includes('nvme') || provLower.includes('ntfs') || provLower.includes('volsnap')) {
+          category = 'storage';
+        } else if (provLower.includes('security') || provLower.includes('audit') || provLower.includes('defender') || provLower.includes('isolatedusermode') || provLower.includes('spp')) {
+          category = 'security';
+        } else if (provLower.includes('pnp') || provLower.includes('usb') || provLower.includes('bth') || provLower.includes('bluetooth') || provLower.includes('audio') || provLower.includes('whea')) {
+          category = 'hardware';
+        } else if (evt.LogName === 'Application' || provLower.includes('app') || provLower.includes('edge') || provLower.includes('chrom') || provLower.includes('office') || provLower.includes('msiinstaller')) {
+          category = 'app';
+        }
+
+        // Determine severity
+        let severity = 'info';
+        if (evt.Level === 1) {
+          severity = 'critical';
+        } else if (evt.Level === 2) {
+          severity = (category === 'hardware' || category === 'storage' || category === 'power') ? 'critical' : 'warning';
+        } else if (evt.Level === 3) {
+          severity = 'warning';
+        } else if ((evt.LevelDisplayName || '').toLowerCase() === 'error') {
+          severity = (category === 'hardware' || category === 'storage' || category === 'power') ? 'critical' : 'warning';
+        } else if ((evt.LevelDisplayName || '').toLowerCase() === 'warning') {
+          severity = 'warning';
+        }
+
+        // Friendly title generation
+        let title = `${provider} (Event ${id})`;
+        if (id === 6013) title = `System Uptime Milestone`;
+        else if (id === 6005) title = `Windows Event Log Started (System Boot)`;
+        else if (id === 6006) title = `Windows Event Log Stopped (System Shutdown)`;
+        else if (id === 42) title = `System Entering Sleep State`;
+        else if (id === 107) title = `System Resumed from Sleep`;
+        else if (id === 7040) title = `Service Config: ${eventData.param1 || 'Windows Service'}`;
+        else if (id === 7036) title = `Service State: ${eventData.param1 || 'Windows Service'}`;
+        else if (id === 7000 || id === 7009) title = `Service Timeout/Failure: ${eventData.param1 || 'Windows Service'}`;
+        else if (id === 19) title = `Windows Update Installation Succeeded`;
+        else if (id === 20) title = `Windows Update Installation Failed`;
+        else if (id === 1033 || id === 11707) title = `Software Installation Completed`;
+        else if (provLower.includes('chromoting')) {
+          if (id === 1) title = `Remote Desktop: Client Connected`;
+          else if (id === 3) title = `Remote Desktop: Access Denied`;
+          else if (id === 4) title = `Remote Desktop: Channel Established`;
+        }
+
+        const cleanMessage = (message || '').trim() || `Windows recorded event ID ${id} from provider '${provider}'.`;
+
+        incidents.push({
+          id: `evt-${evt.LogName || 'sys'}-${id}-${timestamp}-${evt.RecordId || Math.random().toString(36).substr(2, 5)}`,
+          timestamp,
+          category,
+          severity,
+          title,
+          description: cleanMessage,
+          likelyCauses: severity === 'info'
+            ? ['Routine Windows operating system task or background service execution.']
+            : ['Driver or service encountered an operational condition or requested attention.'],
+          remediationSteps: severity === 'info'
+            ? ['No action required. This is standard Windows operational telemetry.']
+            : ['Review technical details or check Windows Event Viewer if related to unexpected behavior.'],
+          technicalDetails: {
+            eventId: id,
+            recordId: evt.RecordId,
+            provider,
+            logName: evt.LogName,
+            level: evt.LevelDisplayName || (severity === 'critical' ? 'Error' : severity === 'warning' ? 'Warning' : 'Information'),
+            rawMessage: message,
+            eventData
+          }
+        });
+      }
     }
   }
 
@@ -523,7 +604,7 @@ function analyzeDiagnostics(events = [], deviceStatus = {}, storageData = {}, sy
   if (hasCritical) {
     overallHealth = {
       status: 'critical',
-      label: 'Attention Needed',
+      label: 'Action Needed',
       color: 'rose',
       summary: 'Critical events detected (unexpected shutdown, BSOD, or hardware fault). Review diagnostic actions below.'
     };

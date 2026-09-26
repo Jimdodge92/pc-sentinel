@@ -1,7 +1,8 @@
 import React from 'react';
 import {
   AlertCircle, AlertTriangle, Info, ChevronRight,
-  Power, Monitor, ShieldAlert, Cpu, HardDrive, FileText
+  Power, Monitor, ShieldAlert, Cpu, HardDrive, FileText,
+  Wifi, Server, Layers, ShieldCheck, Usb
 } from 'lucide-react';
 
 export default function IncidentCard({ incident, onSelect }) {
@@ -12,6 +13,11 @@ export default function IncidentCard({ incident, onSelect }) {
       case 'bsod': return <ShieldAlert className="w-4 h-4 text-rose-400" />;
       case 'thermal': return <Cpu className="w-4 h-4 text-amber-400" />;
       case 'storage': return <HardDrive className="w-4 h-4 text-cyan-400" />;
+      case 'hardware': return <Usb className="w-4 h-4 text-indigo-400" />;
+      case 'app': return <Layers className="w-4 h-4 text-emerald-400" />;
+      case 'system': return <Server className="w-4 h-4 text-blue-400" />;
+      case 'network': return <Wifi className="w-4 h-4 text-sky-400" />;
+      case 'security': return <ShieldCheck className="w-4 h-4 text-teal-400" />;
       case 'memory': return <Cpu className="w-4 h-4 text-blue-400" />;
       default: return <FileText className="w-4 h-4 text-slate-400" />;
     }
@@ -20,7 +26,7 @@ export default function IncidentCard({ incident, onSelect }) {
   const getSeverityBorder = (sev) => {
     if (sev === 'critical') return 'border-l-rose-500 hover:border-rose-500/50';
     if (sev === 'warning') return 'border-l-amber-500 hover:border-amber-500/50';
-    return 'border-l-slate-600 hover:border-slate-500/50';
+    return 'border-l-slate-700 hover:border-slate-500/50';
   };
 
   const getSeverityBadge = (sev) => {
@@ -39,7 +45,7 @@ export default function IncidentCard({ incident, onSelect }) {
       );
     }
     return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-400 border border-slate-700">
+      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
         Info
       </span>
     );
@@ -66,6 +72,7 @@ export default function IncidentCard({ incident, onSelect }) {
 
   return (
     <div
+      id={`incident-${incident.id}`}
       onClick={() => onSelect(incident)}
       className={`bg-slate-900/70 border border-slate-800 border-l-4 rounded-xl p-4 transition-all duration-200 cursor-pointer hover:bg-slate-850/80 hover:shadow-lg hover:-translate-y-0.5 flex flex-col justify-between gap-3 ${getSeverityBorder(
         incident.severity
@@ -95,7 +102,7 @@ export default function IncidentCard({ incident, onSelect }) {
           {incident.description}
         </p>
 
-        {incident.likelyCauses && incident.likelyCauses.length > 0 && (
+        {incident.likelyCauses && incident.likelyCauses.length > 0 && incident.severity !== 'info' && (
           <div className="mt-2.5 pt-2.5 border-t border-slate-800/80 flex items-center gap-2 text-xs text-slate-400">
             <span className="text-amber-400 font-medium shrink-0">Likely cause:</span>
             <span className="truncate text-slate-300">{incident.likelyCauses[0]}</span>
@@ -108,7 +115,7 @@ export default function IncidentCard({ incident, onSelect }) {
           {new Date(incident.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
         <span className="text-cyan-400 font-medium flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-          View Diagnosis & Fix <ChevronRight className="w-3.5 h-3.5" />
+          {incident.severity === 'info' ? 'View Event Details' : 'View Diagnosis & Fix'} <ChevronRight className="w-3.5 h-3.5" />
         </span>
       </div>
     </div>
