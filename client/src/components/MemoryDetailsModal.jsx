@@ -30,8 +30,15 @@ export default function MemoryDetailsModal({ isOpen, onClose, systemSummary }) {
   useEffect(() => {
     if (isOpen) {
       fetchTopProcesses();
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape' && onClose) {
+          onClose();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -42,7 +49,10 @@ export default function MemoryDetailsModal({ isOpen, onClose, systemSummary }) {
   const ramUsagePercent = systemSummary?.RAMUsagePercent || 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+    >
       <div
         className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}

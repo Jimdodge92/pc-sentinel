@@ -7,7 +7,7 @@ import HardwareStatusCard from './components/HardwareStatusCard';
 import DevicePairingModal from './components/DevicePairingModal';
 import MemoryDetailsModal from './components/MemoryDetailsModal';
 import {
-  Search, CheckCircle2, AlertCircle, Power, Lock,
+  Search, CheckCircle2, AlertCircle, AlertTriangle, Power, Lock,
   Smartphone, RefreshCw, Calendar, Trash2, Info,
   Flame, ZapOff, Radio, RotateCw
 } from 'lucide-react';
@@ -52,9 +52,9 @@ export default function App() {
   const [pinError, setPinError] = useState(null);
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
 
-  // Filters
+  // Filters - Defaults to Sentinel Main Screen (Critical events only)
   const [activeCategory, setActiveCategory] = useState('all');
-  const [severityFilter, setSeverityFilter] = useState('all');
+  const [severityFilter, setSeverityFilter] = useState('critical');
   const [searchQuery, setSearchQuery] = useState('');
   const [daysFilter, setDaysFilter] = useState(14);
 
@@ -451,6 +451,18 @@ export default function App() {
     }
   };
 
+  // Global Reset / Navigate to Sentinel Main (Home) Screen (Critical events only)
+  const handleResetHome = () => {
+    setSelectedIncident(null);
+    setIsMemoryModalOpen(false);
+    setIsPairingModalOpen(false);
+    setShowClearInfoModal(false);
+    setActiveCategory('all');
+    setSeverityFilter('critical');
+    setSearchQuery('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Permanently clear an incident and all identical events upon user confirmation of resolution
   const handleResolveIncident = async (incidentId, stepTitle, targetIncident) => {
     try {
@@ -604,6 +616,7 @@ export default function App() {
         onOpenRemoteAccess={() => setIsPairingModalOpen(true)}
         isOffline={isOffline}
         onJumpToIncident={jumpToLatestIncident}
+        onResetHome={handleResetHome}
       />
 
       {/* 2. Main Content Container */}
@@ -846,27 +859,27 @@ export default function App() {
                   </div>
 
                   {/* Severity Filter Quick Pills */}
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60 flex-wrap">
                     <div className="flex items-center gap-1.5 text-xs overflow-x-auto">
                       <span className="text-[11px] text-slate-500 uppercase font-bold tracking-wider mr-1">Severity:</span>
                       {[
-                        { id: 'all', label: 'All', count: severityCounts.all, color: 'bg-cyan-500 text-slate-950' },
                         { id: 'critical', label: 'Critical', count: severityCounts.critical, color: 'bg-rose-500 text-white' },
                         { id: 'warning', label: 'Warnings', count: severityCounts.warning, color: 'bg-amber-500 text-slate-950' },
+                        { id: 'all', label: 'All Logs', count: severityCounts.all, color: 'bg-cyan-500 text-slate-950' },
                         { id: 'info', label: 'Info Logs', count: severityCounts.info, color: 'bg-blue-500 text-white' }
                       ].map(sev => (
                         <button
                           key={sev.id}
                           onClick={() => setSeverityFilter(sev.id)}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5 ${
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                             severityFilter === sev.id
-                              ? `${sev.color} shadow-sm font-bold`
+                              ? `${sev.color} shadow-sm font-bold ring-1 ring-white/20`
                               : 'bg-slate-950/60 hover:bg-slate-800 text-slate-400 border border-slate-800'
                           }`}
                         >
                           <span>{sev.label}</span>
                           <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                            severityFilter === sev.id ? 'bg-black/20' : 'bg-slate-800 text-slate-400'
+                            severityFilter === sev.id ? 'bg-black/25 text-inherit' : 'bg-slate-800 text-slate-400'
                           }`}>
                             {sev.count}
                           </span>
@@ -874,24 +887,37 @@ export default function App() {
                       ))}
                     </div>
 
-                    {/* Clear All Info Logs Button */}
-                    {severityCounts.info > 0 && (
-                      <button
-                        onClick={() => setShowClearInfoModal(true)}
-                        disabled={isClearingInfo}
-                        className="px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:border-rose-500/60 shrink-0 shadow-sm active:scale-95"
-                        title="Clear all routine informational events"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                        <span>Clear All Info Logs ({severityCounts.info})</span>
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {/* Return to Main Screen Pill (visible when not on default home filter) */}
+                      {(severityFilter !== 'critical' || activeCategory !== 'all' || searchQuery.trim() !== '') && (
+                        <button
+                          onClick={handleResetHome}
+                          className="px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5 bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-500/40 hover:border-cyan-400 shrink-0 shadow-sm active:scale-95 cursor-pointer"
+                          title="Return to Main Screen (Critical events)"
+                        >
+                          <span>&larr; Back to Home</span>
+                        </button>
+                      )}
+
+                      {/* Clear All Info Logs Button */}
+                      {severityCounts.info > 0 && (
+                        <button
+                          onClick={() => setShowClearInfoModal(true)}
+                          disabled={isClearingInfo}
+                          className="px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:border-rose-500/60 shrink-0 shadow-sm active:scale-95 cursor-pointer"
+                          title="Clear all routine informational events"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                          <span>Clear All Info ({severityCounts.info})</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Category Filter Pills (Full Spectrum) */}
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
                     {[
-                      { id: 'all', label: 'All Logs', count: categoryCounts.all },
+                      { id: 'all', label: 'All Categories', count: categoryCounts.all },
                       { id: 'power', label: 'Power & Sleep', count: categoryCounts.power },
                       { id: 'thermal', label: 'Thermals', count: categoryCounts.thermal },
                       { id: 'hardware', label: 'Hardware & USB', count: categoryCounts.hardware },
@@ -905,8 +931,13 @@ export default function App() {
                     ].filter(tab => tab.id === 'all' || tab.count > 0).map(tab => (
                       <button
                         key={tab.id}
-                        onClick={() => setActiveCategory(tab.id)}
-                        className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-all flex items-center gap-1.5 text-xs ${
+                        onClick={() => {
+                          setActiveCategory(tab.id);
+                          if (tab.id !== 'all' && severityFilter === 'critical') {
+                            setSeverityFilter('all');
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-all flex items-center gap-1.5 text-xs cursor-pointer ${
                           activeCategory === tab.id
                             ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
                             : 'bg-slate-950/50 hover:bg-slate-800 text-slate-400 border border-slate-800/80'
@@ -942,7 +973,7 @@ export default function App() {
                       <button
                         onClick={() => setShowClearInfoModal(true)}
                         disabled={isClearingInfo}
-                        className="px-3.5 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-semibold transition-all flex items-center gap-1.5 shrink-0 shadow-sm active:scale-95"
+                        className="px-3.5 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-semibold transition-all flex items-center gap-1.5 shrink-0 shadow-sm active:scale-95 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5 text-rose-400" />
                         <span>Clear All ({severityCounts.info}) Info Logs</span>
@@ -956,17 +987,101 @@ export default function App() {
                       <p className="text-sm">Inspecting Windows Event Logs & Hardware Telemetry...</p>
                     </div>
                   ) : filteredIncidents.length === 0 ? (
-                    <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-12 text-center text-slate-400 space-y-3">
-                      <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
-                        <CheckCircle2 className="w-6 h-6" />
+                    severityFilter === 'critical' ? (
+                      searchQuery.trim() ? (
+                        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-10 text-center space-y-3">
+                          <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mx-auto text-slate-400">
+                            <Search className="w-6 h-6" />
+                          </div>
+                          <h3 className="text-base font-bold text-white">No Critical Events Matching "{searchQuery}"</h3>
+                          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                            No critical crashes or emergency shutdowns match your search term.
+                          </p>
+                          <button
+                            onClick={() => setSearchQuery('')}
+                            className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition-all cursor-pointer"
+                          >
+                            Clear Search
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-slate-800/90 rounded-2xl p-8 sm:p-12 text-center space-y-5 shadow-2xl">
+                          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400 shadow-xl shadow-emerald-500/10 ring-1 ring-emerald-500/20">
+                            <CheckCircle2 className="w-8 h-8" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <h3 className="text-xl font-black text-white tracking-tight">No Critical Events</h3>
+                            <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+                              No unexpected shutdowns, blue screens (BSOD), or emergency thermal limit trips logged in the last {daysFilter} days.
+                            </p>
+                          </div>
+                          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                            <button
+                              onClick={() => {
+                                setSeverityFilter('warning');
+                                setActiveCategory('all');
+                                setSearchQuery('');
+                              }}
+                              className="inline-flex items-center gap-2.5 px-6 py-3 rounded-xl font-bold text-xs sm:text-sm bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xl shadow-amber-500/20 active:scale-95 transition-all cursor-pointer group"
+                            >
+                              <AlertTriangle className="w-4 h-4 text-slate-950 group-hover:scale-110 transition-transform" />
+                              <span>Review Warnings</span>
+                              {severityCounts.warning > 0 && (
+                                <span className="bg-black/25 text-slate-950 text-xs px-2 py-0.5 rounded-full font-mono font-black">
+                                  {severityCounts.warning}
+                                </span>
+                              )}
+                            </button>
+                            {severityCounts.all > 0 && (
+                              <button
+                                onClick={() => {
+                                  setSeverityFilter('all');
+                                  setActiveCategory('all');
+                                  setSearchQuery('');
+                                }}
+                                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl font-semibold text-xs text-slate-400 hover:text-white bg-slate-900/60 hover:bg-slate-800 border border-slate-800 transition-all cursor-pointer"
+                              >
+                                <span>View All Logs ({severityCounts.all})</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    ) : severityFilter === 'warning' ? (
+                      <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-10 text-center space-y-4 shadow-xl">
+                        <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center mx-auto text-emerald-400">
+                          <CheckCircle2 className="w-7 h-7" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <h3 className="text-lg font-bold text-white tracking-tight">No Warnings Detected</h3>
+                          <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                            {searchQuery
+                              ? 'No warnings matched your search term.'
+                              : 'Your system has logged zero driver resets, thermal throttling alerts, or high wear warnings.'}
+                          </p>
+                        </div>
+                        <div className="pt-2 flex items-center justify-center gap-2">
+                          <button
+                            onClick={handleResetHome}
+                            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-all cursor-pointer"
+                          >
+                            <span>&larr; Back to Main Screen</span>
+                          </button>
+                        </div>
                       </div>
-                      <h3 className="text-base font-bold text-white">No Incidents Found</h3>
-                      <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                        {searchQuery
-                          ? 'No events matched your search query. Try clearing the filter.'
-                          : `Your system has logged zero ${activeCategory === 'all' ? '' : activeCategory} issues within the selected ${daysFilter}-day window.`}
-                      </p>
-                    </div>
+                    ) : (
+                      <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-12 text-center text-slate-400 space-y-3">
+                        <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
+                          <CheckCircle2 className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-base font-bold text-white">No Incidents Found</h3>
+                        <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                          {searchQuery
+                            ? 'No events matched your search query. Try clearing the filter.'
+                            : `Your system has logged zero ${activeCategory === 'all' ? '' : activeCategory} issues within the selected ${daysFilter}-day window.`}
+                        </p>
+                      </div>
+                    )
                   ) : (
                     filteredIncidents.map(inc => (
                       <IncidentCard

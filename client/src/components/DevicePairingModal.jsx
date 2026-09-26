@@ -38,7 +38,14 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
 
   useEffect(() => {
     fetchDeviceInfo();
-  }, []);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
@@ -97,7 +104,10 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
   const pairingUrl = `${currentHost}?pair=${pairingCode}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget && onClose) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+    >
       <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl shadow-cyan-950/40 overflow-hidden">
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">

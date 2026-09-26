@@ -263,6 +263,28 @@ app.get('/api/shutdown-intent', requirePinIfRemote, (req, res) => {
 });
 
 /**
+ * Immediate internal shutdown broadcast endpoint (triggered by Windows Event / Task Scheduler)
+ */
+app.all('/api/internal/broadcast-shutdown', async (req, res) => {
+  try {
+    const intent = await runPowerShellScript('check-shutdown-intent.ps1', ['-WindowSeconds', '60']);
+    const finalIntent = (intent && intent.state) ? intent : {
+      state: 'rebooting',
+      title: '🔄 User-Initiated Restart in Progress',
+      message: 'Windows is currently restarting. Connection will restore momentarily as system reboots.',
+      willRestore: true,
+      timestamp: new Date().toISOString()
+    };
+    saveLastShutdownIntent(finalIntent);
+    console.log(`[ShutdownSentinel] 🚨 INSTANT TRIGGER BROADCAST: ${finalIntent.title}`);
+    broadcastSSE('shutdown_intent', finalIntent);
+    res.json({ success: true, intent: finalIntent });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * Health check endpoint
  */
 app.get('/api/health', (req, res) => {

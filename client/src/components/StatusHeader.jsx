@@ -1,7 +1,7 @@
 import React from 'react';
 import { Activity, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle, Monitor, Cpu, Clock, Laptop, Globe, Smartphone, ChevronRight } from 'lucide-react';
 
-export default function StatusHeader({ overallHealth, systemSummary, loading, onRefresh, lastScanTime, onOpenRemoteAccess, isOffline, onJumpToIncident }) {
+export default function StatusHeader({ overallHealth, systemSummary, loading, onRefresh, lastScanTime, onOpenRemoteAccess, isOffline, onJumpToIncident, onResetHome }) {
   const getStatusBadge = () => {
     if (isOffline) {
       return (
@@ -54,25 +54,32 @@ export default function StatusHeader({ overallHealth, systemSummary, loading, on
   return (
     <header className="border-b border-slate-800 bg-[#0c1220]/80 backdrop-blur-md sticky top-0 z-30 px-6 py-4">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        {/* Title & Brand */}
-        <div className="flex items-center gap-4">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 ring-1 ring-white/20">
-            <Activity className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
-                PC SENTINEL
-                <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">
-                  Diagnostics
-                </span>
-              </h1>
-              {getStatusBadge()}
+        {/* Title & Brand (Click to return Home from any screen) */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <button
+            type="button"
+            onClick={onResetHome}
+            className="flex items-center gap-3.5 text-left group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded-xl transition-all select-none -m-1.5 p-1.5 hover:bg-slate-900/60"
+            title="Click to return to PC Sentinel Home screen"
+          >
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 ring-1 ring-white/20 group-hover:scale-105 group-hover:shadow-cyan-500/40 group-active:scale-95 transition-all shrink-0">
+              <Activity className="w-6 h-6 text-white" />
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Intelligent Windows Hardware, Crash & Shutdown Telemetry
-            </p>
-          </div>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2 group-hover:text-cyan-300 transition-colors">
+                  PC SENTINEL
+                  <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 group-hover:border-cyan-500/60 transition-colors">
+                    Diagnostics
+                  </span>
+                </h1>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5 group-hover:text-slate-300 transition-colors">
+                Intelligent Windows Hardware, Crash & Shutdown Telemetry
+              </p>
+            </div>
+          </button>
+          {getStatusBadge()}
         </div>
 
         {/* System Quick Specs & Scan Button */}

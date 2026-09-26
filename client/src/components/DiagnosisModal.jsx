@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X, CheckCircle2, AlertCircle, AlertTriangle, Info,
   ChevronDown, ChevronUp, Copy, Check, Wrench, FileText,
@@ -13,6 +13,16 @@ export default function DiagnosisModal({ incident, allIncidents = [], onClose, o
   const [isResolving, setIsResolving] = useState(false);
   const [resolvedSuccess, setResolvedSuccess] = useState(false);
   const [showTechnical, setShowTechnical] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
   const [copied, setCopied] = useState(false);
 
   // Count how many identical events match this incident
@@ -206,7 +216,10 @@ ${incident.remediationSteps?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in overflow-y-auto">
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget && onClose) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in overflow-y-auto"
+    >
       <div className="bg-[#0f172a] border border-slate-700/80 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">
         {/* Header */}
         <div className="p-6 border-b border-slate-800 bg-slate-900/60 flex items-start justify-between gap-4">
