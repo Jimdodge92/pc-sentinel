@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle, Monitor, Cpu, Clock, Laptop, Globe } from 'lucide-react';
+import { Activity, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle, Monitor, Cpu, Clock, Laptop, Globe, Smartphone } from 'lucide-react';
 
 export default function StatusHeader({ overallHealth, systemSummary, loading, onRefresh, lastScanTime, onOpenRemoteAccess, isOffline }) {
   const getStatusBadge = () => {
