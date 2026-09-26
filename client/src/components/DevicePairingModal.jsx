@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   X, Smartphone, QrCode, Copy, Check, RefreshCw,
-  ExternalLink, ShieldCheck, Cloud, AlertCircle, Laptop, Settings
+  ExternalLink, ShieldCheck, Cloud, AlertCircle, Laptop, Settings,
+  ArrowDownToLine, Download
 } from 'lucide-react';
+import { getApiBase } from '../App';
 
 export default function DevicePairingModal({ onClose, onRegenerate }) {
   const [deviceInfo, setDeviceInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState('pair'); // 'pair' | 'settings'
+  const [activeTab, setActiveTab] = useState('apk'); // 'apk' | 'web' | 'settings'
 
   // Cloud Config Form State
   const [projectIdInput, setProjectIdInput] = useState('');
@@ -20,7 +22,7 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
   const fetchDeviceInfo = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/device/info');
+      const res = await fetch(`${getApiBase()}/api/device/info`);
       if (res.ok) {
         const json = await res.json();
         setDeviceInfo(json);
@@ -55,7 +57,7 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
 
   const handleRegenerateCode = async () => {
     try {
-      const res = await fetch('/api/device/regenerate-code', { method: 'POST' });
+      const res = await fetch(`${getApiBase()}/api/device/regenerate-code`, { method: 'POST' });
       if (res.ok) {
         const json = await res.json();
         setDeviceInfo(json);
@@ -73,7 +75,7 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
     setCloudMsg(null);
 
     try {
-      const res = await fetch('/api/device/firebase-config', {
+      const res = await fetch(`${getApiBase()}/api/device/firebase-config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -99,9 +101,12 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
   const pairingCode = deviceInfo?.deviceId || 'SENT-????';
   const localIp = deviceInfo?.localIp || '192.168.4.39';
   const port = deviceInfo?.port || 3500;
-  // If hosted on a cloud domain or locally, generate direct pairing URL
   const currentHost = window.location.origin;
-  const pairingUrl = `${currentHost}?pair=${pairingCode}`;
+
+  // APK Direct Download URL
+  const apkDownloadUrl = deviceInfo?.apkDownloadUrl || `${currentHost}/download/pc-sentinel.apk`;
+  // Web Companion Browser URL
+  const pairingUrl = deviceInfo?.pairingUrl || `${currentHost}?pair=${pairingCode}`;
 
   return (
     <div
@@ -117,17 +122,17 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
             </div>
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                Pair Phone & Companion App
+                Mobile Companion & APK
                 <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">
-                  Instant Link
+                  Android Native
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">Scan to open the complete PC Sentinel diagnostic app on your phone</p>
+              <p className="text-xs text-slate-400">Install the standalone APK or open the web dashboard</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -136,26 +141,37 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
         {/* Tab Selector */}
         <div className="flex border-b border-slate-800 bg-slate-950/30 px-6 gap-2 text-xs font-medium">
           <button
-            onClick={() => setActiveTab('pair')}
-            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all ${
-              activeTab === 'pair'
+            onClick={() => setActiveTab('apk')}
+            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+              activeTab === 'apk'
+                ? 'border-emerald-400 text-emerald-300 font-semibold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Download className="w-4 h-4 text-emerald-400" />
+            <span>Download APK (Recommended)</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('web')}
+            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+              activeTab === 'web'
                 ? 'border-cyan-400 text-cyan-300 font-semibold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <QrCode className="w-4 h-4" />
-            Scan QR & Pairing Code
+            <span>Web Companion</span>
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all ${
+            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === 'settings'
                 ? 'border-cyan-400 text-cyan-300 font-semibold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Cloud className="w-4 h-4" />
-            Cloud Relay Backend
+            <span>Cloud Relay</span>
             {deviceInfo?.isCloudActive && (
               <span className="w-2 h-2 rounded-full bg-emerald-400" title="Cloud Relay active" />
             )}
@@ -164,7 +180,75 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
 
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-200 text-xs">
-          {activeTab === 'pair' && (
+          {/* 1. Android APK Tab */}
+          {activeTab === 'apk' && (
+            <div className="space-y-6">
+              {/* QR Code and APK Direct Download */}
+              <div className="flex flex-col sm:flex-row items-center gap-6 p-5 rounded-xl bg-slate-950/70 border border-emerald-500/30 shadow-inner">
+                {/* QR Code for APK */}
+                <div className="p-3.5 bg-white rounded-xl shadow-xl shrink-0 flex flex-col items-center">
+                  <QRCodeSVG
+                    value={apkDownloadUrl}
+                    size={150}
+                    level="M"
+                    includeMargin={false}
+                  />
+                  <span className="text-[10px] text-slate-800 font-mono mt-2 font-bold tracking-wider">
+                    SCAN TO DOWNLOAD
+                  </span>
+                </div>
+
+                {/* Instructions & Actions */}
+                <div className="space-y-3 flex-1 w-full text-center sm:text-left">
+                  <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+                    <span className="text-sm font-bold text-white">PC Sentinel Native Android App</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
+                      v1.0 • {deviceInfo?.apkSizeMB || '11.9'} MB
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Scan with your phone or tablet camera to directly download <strong>pc-sentinel.apk</strong>. Once installed, the app runs locally on your device with <strong>zero server dependencies</strong>—it will always open even if the ThinkPad is completely dead.
+                  </p>
+
+                  <div className="flex items-center justify-center sm:justify-start gap-2 pt-1 flex-wrap">
+                    <a
+                      href={apkDownloadUrl}
+                      download="pc-sentinel.apk"
+                      className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <ArrowDownToLine className="w-4 h-4 text-slate-950" />
+                      <span>Download APK Directly</span>
+                    </a>
+                    <button
+                      onClick={() => handleCopy(apkDownloadUrl)}
+                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 cursor-pointer"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copied ? 'URL Copied!' : 'Copy Link'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sideload Instructions */}
+              <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 space-y-2">
+                <h4 className="font-bold text-white text-xs flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-emerald-400" />
+                  <span>How to Install on Android Phone / Tablet:</span>
+                </h4>
+                <ol className="list-decimal list-inside space-y-1 text-slate-300 text-[11px] leading-relaxed">
+                  <li>Scan the QR code or tap <strong>Download APK Directly</strong> on your phone.</li>
+                  <li>Tap the downloaded <code className="text-cyan-300 bg-slate-900 px-1 py-0.5 rounded">pc-sentinel.apk</code> in your notification bar or Downloads.</li>
+                  <li>Tap <strong>Install</strong> (if prompted, enable <em>"Install unknown apps"</em> for your browser).</li>
+                  <li>Launch <strong>PC Sentinel</strong> from your Android home screen!</li>
+                </ol>
+              </div>
+            </div>
+          )}
+
+          {/* 2. Web Companion Tab */}
+          {activeTab === 'web' && (
             <div className="space-y-6">
               {/* QR Code and Device Code Card */}
               <div className="flex flex-col sm:flex-row items-center gap-6 p-5 rounded-xl bg-slate-950/70 border border-slate-800 shadow-inner">
@@ -193,7 +277,7 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
                     </span>
                     <button
                       onClick={handleRegenerateCode}
-                      className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                      className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
                       title="Generate new pairing code"
                     >
                       <RefreshCw className="w-4 h-4" />
@@ -201,46 +285,42 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
                   </div>
 
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    Open your phone's camera and point it at the QR code. Your phone will immediately open the <strong>full PC Sentinel dashboard</strong>, paired directly to this ThinkPad.
+                    Open your phone's camera and point it at the QR code to open the <strong>web version</strong> in Chrome, Safari, or Edge without installing an app.
                   </p>
 
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex items-center justify-center sm:justify-start gap-2 pt-1">
+                    <a
+                      href={pairingUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Open in Browser</span>
+                    </a>
                     <button
                       onClick={() => handleCopy(pairingUrl)}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700"
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 cursor-pointer"
                     >
                       {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copied ? 'Link Copied!' : 'Copy Pairing Link'}</span>
+                      <span>{copied ? 'Link Copied!' : 'Copy Web Link'}</span>
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Status & Capabilities Card */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-slate-950/50 border border-slate-800/80 rounded-xl p-3.5 space-y-1">
-                  <div className="flex items-center gap-2 text-white font-semibold">
-                    <Laptop className="w-4 h-4 text-cyan-400" />
-                    <span>Host Hardware</span>
-                  </div>
-                  <span className="text-xs text-slate-300 font-mono block">
-                    {deviceInfo?.deviceName || 'Jims-ThinkPad'} (ThinkPad T15)
-                  </span>
-                  <span className="text-[11px] text-slate-500 block">IP: {localIp}:{port}</span>
+              {/* Status Card */}
+              <div className="bg-slate-950/50 border border-slate-800/80 rounded-xl p-3.5 space-y-1">
+                <div className="flex items-center gap-2 text-white font-semibold">
+                  <Laptop className="w-4 h-4 text-cyan-400" />
+                  <span>Host Endpoint</span>
                 </div>
-
-                <div className="bg-slate-950/50 border border-slate-800/80 rounded-xl p-3.5 space-y-1">
-                  <div className="flex items-center gap-2 text-white font-semibold">
-                    <Cloud className="w-4 h-4 text-blue-400" />
-                    <span>Offline Crash Access</span>
-                  </div>
-                  <span className={`text-xs font-medium block ${deviceInfo?.isCloudActive ? 'text-emerald-400' : 'text-slate-400'}`}>
-                    {deviceInfo?.isCloudActive ? 'Cloud Relay Active' : 'Local Standby'}
-                  </span>
-                  <span className="text-[11px] text-slate-500 block">
-                    {deviceInfo?.isCloudActive ? 'Full app accessible even when PC is off' : 'Configure cloud backend for 24/7 access'}
-                  </span>
-                </div>
+                <span className="text-xs text-slate-300 font-mono block">
+                  {deviceInfo?.deviceName || 'ThinkPad'} ({localIp}:{port})
+                </span>
+                <span className="text-[11px] text-slate-400 block">
+                  Web companion requires the ThinkPad server to be running and reachable.
+                </span>
               </div>
             </div>
           )}

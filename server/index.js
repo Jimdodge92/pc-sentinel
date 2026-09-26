@@ -722,16 +722,39 @@ app.post('/api/incidents/resolve-batch', requirePinIfRemote, (req, res) => {
 });
 
 /**
+/**
+ * Direct Android APK Download Route
+ */
+app.get(['/download/pc-sentinel.apk', '/downloads/pc-sentinel.apk', '/api/download/apk'], (req, res) => {
+  const apkPath = path.join(__dirname, 'public/pc-sentinel.apk');
+  if (fs.existsSync(apkPath)) {
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="pc-sentinel.apk"');
+    return res.sendFile(apkPath);
+  }
+  res.status(404).send('PC Sentinel Android APK is currently being compiled. Please try again shortly.');
+});
+
+/**
  * Device Pairing & Identity info
  */
 app.get('/api/device/info', (req, res) => {
   const device = getOrInitDevice();
   const localIp = getLocalIp();
+  const reqHost = req.headers.host || `${localIp}:${PORT}`;
+  const protocol = req.protocol || 'http';
+  const apkPath = path.join(__dirname, 'public/pc-sentinel.apk');
+  const apkExists = fs.existsSync(apkPath);
+  const apkSizeMB = apkExists ? (fs.statSync(apkPath).size / (1024 * 1024)).toFixed(1) : null;
+
   res.json({
     ...device,
     localIp,
     port: PORT,
-    pairingUrl: `http://${localIp}:${PORT}?pair=${device.deviceId}`
+    pairingUrl: `${protocol}://${reqHost}?pair=${device.deviceId}`,
+    apkDownloadUrl: `${protocol}://${reqHost}/download/pc-sentinel.apk`,
+    apkExists,
+    apkSizeMB
   });
 });
 
@@ -742,10 +765,19 @@ app.post('/api/device/regenerate-code', requirePinIfRemote, (req, res) => {
   const newCode = regenerateDeviceCode();
   const device = getOrInitDevice();
   const localIp = getLocalIp();
+  const reqHost = req.headers.host || `${localIp}:${PORT}`;
+  const protocol = req.protocol || 'http';
+  const apkPath = path.join(__dirname, 'public/pc-sentinel.apk');
+  const apkExists = fs.existsSync(apkPath);
+  const apkSizeMB = apkExists ? (fs.statSync(apkPath).size / (1024 * 1024)).toFixed(1) : null;
+
   res.json({
     ...device,
     deviceId: newCode,
-    pairingUrl: `http://${localIp}:${PORT}?pair=${newCode}`
+    pairingUrl: `${protocol}://${reqHost}?pair=${newCode}`,
+    apkDownloadUrl: `${protocol}://${reqHost}/download/pc-sentinel.apk`,
+    apkExists,
+    apkSizeMB
   });
 });
 

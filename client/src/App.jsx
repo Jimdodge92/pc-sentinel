@@ -12,6 +12,19 @@ import {
   Flame, ZapOff, Radio, RotateCw
 } from 'lucide-react';
 
+// Dynamic Host API Base (supports both Web browser and Android APK native asset loading)
+export const getApiBase = () => {
+  if (typeof window !== 'undefined') {
+    if (window.SENTINEL_API_BASE) return window.SENTINEL_API_BASE.replace(/\/+$/, '');
+    const stored = localStorage.getItem('sentinel_host_url');
+    if (stored) return stored.replace(/\/+$/, '');
+    if (window.location.protocol === 'file:') {
+      return 'http://173.18.4.217:3500';
+    }
+  }
+  return '';
+};
+
 export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +73,7 @@ export default function App() {
 
   const fetchDeviceInfo = async () => {
     try {
-      const res = await fetch('/api/device/info');
+      const res = await fetch(`${getApiBase()}/api/device/info`);
       if (res.ok) {
         const json = await res.json();
         setDeviceInfo(json);
@@ -80,7 +93,7 @@ export default function App() {
     try {
       setLoading(true);
       setError(null);
-      const url = `/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
+      const url = `${getApiBase()}/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
       const headers = {};
       if (activePin) {
         headers['x-sentinel-pin'] = activePin;
@@ -236,7 +249,7 @@ export default function App() {
       isConnecting = true;
 
       const pinParam = userPin ? `?pin=${encodeURIComponent(userPin)}` : '';
-      const sseUrl = `/api/stream${pinParam}`;
+      const sseUrl = `${getApiBase()}/api/stream${pinParam}`;
 
       try {
         eventSource = new EventSource(sseUrl);
@@ -258,6 +271,15 @@ export default function App() {
             console.warn('[Sentinel SSE] 🚨 Intercepted impending shutdown:', intent);
             setShutdownIntent(intent);
             localStorage.setItem('sentinel_shutdown_intent', JSON.stringify(intent));
+
+            // Trigger native Android notification if running in mobile companion APK
+            if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.showNotification) {
+              window.AndroidBridge.showNotification(
+                intent.title || 'PC Sentinel Alert',
+                intent.message || 'Host is shutting down or restarting',
+                intent.state === 'thermal_trip' || intent.state === 'critical'
+              );
+            }
           } catch (err) {}
         });
 
@@ -274,7 +296,7 @@ export default function App() {
             pollTimer = setInterval(async () => {
               setReconnectAttempt(prev => prev + 1);
               try {
-                const testRes = await fetch('/api/health', { signal: AbortSignal.timeout(2000) });
+                const testRes = await fetch(`${getApiBase()}/api/health`, { signal: AbortSignal.timeout(2000) });
                 if (testRes.ok) {
                   clearInterval(pollTimer);
                   pollTimer = null;
@@ -313,7 +335,7 @@ export default function App() {
     setPinError(null);
 
     try {
-      const res = await fetch('/api/auth/verify', {
+      const res = await fetch(`${getApiBase()}/api/auth/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin: pinInput })
@@ -492,7 +514,7 @@ export default function App() {
 
       // 1. Persist to server/resolvedIncidents.json via API
       try {
-        await fetch('/api/incidents/resolve', {
+        await fetch(`${getApiBase()}/api/incidents/resolve`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -571,7 +593,7 @@ export default function App() {
 
       // 1. Call backend API to record batch clearance
       try {
-        await fetch('/api/incidents/clear-all-info', {
+        await fetch(`${getApiBase()}/api/incidents/clear-all-info`, {
           method: 'POST',
           headers
         });

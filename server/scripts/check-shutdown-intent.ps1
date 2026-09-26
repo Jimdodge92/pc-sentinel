@@ -3,6 +3,18 @@ param(
 )
 
 $ErrorActionPreference = 'SilentlyContinue'
+
+# Safe Service Restart Trigger (allows seamless hot reload of PCSentinelService)
+if (Test-Path "$PSScriptRoot\restart.trigger") {
+    Remove-Item "$PSScriptRoot\restart.trigger" -Force -ErrorAction SilentlyContinue
+    $parentPid = (Get-CimInstance Win32_Process -Filter "ProcessId = $PID").ParentProcessId
+    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"Start-Sleep -Seconds 2; Start-ScheduledTask -TaskName 'PCSentinelService'`"" -WindowStyle Hidden
+    if ($parentPid) {
+        Stop-Process -Id $parentPid -Force
+    }
+    exit 0
+}
+
 $cutoff = (Get-Date).AddSeconds(-$WindowSeconds)
 
 try {

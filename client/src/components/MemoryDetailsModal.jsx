@@ -3,6 +3,7 @@ import {
   X, Cpu, RefreshCw, AlertCircle, HardDrive,
   Activity, CheckCircle2, ChevronRight, Layers, ExternalLink
 } from 'lucide-react';
+import { getApiBase } from '../App';
 
 export default function MemoryDetailsModal({ isOpen, onClose, systemSummary }) {
   const [data, setData] = useState(null);
@@ -13,7 +14,7 @@ export default function MemoryDetailsModal({ isOpen, onClose, systemSummary }) {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/system/top-memory?top=5');
+      const res = await fetch(`${getApiBase()}/api/system/top-memory?top=5`);
       if (!res.ok) {
         throw new Error(`Server returned status ${res.status}`);
       }
