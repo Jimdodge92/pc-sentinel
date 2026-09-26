@@ -68,6 +68,42 @@ function saveResolvedIncidents(list) {
   }
 }
 
+// Persistent storage for last shutdown intent
+const SHUTDOWN_INTENT_FILE = path.join(__dirname, 'lastShutdownIntent.json');
+
+function saveLastShutdownIntent(intent) {
+  try {
+    fs.writeFileSync(SHUTDOWN_INTENT_FILE, JSON.stringify(intent, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Error saving last shutdown intent:', e.message);
+  }
+}
+
+function loadLastShutdownIntent() {
+  try {
+    if (fs.existsSync(SHUTDOWN_INTENT_FILE)) {
+      return JSON.parse(fs.readFileSync(SHUTDOWN_INTENT_FILE, 'utf8'));
+    }
+  } catch (e) {
+    console.error('Error loading last shutdown intent:', e.message);
+  }
+  return null;
+}
+
+// Active Server-Sent Events (SSE) subscribers
+const sseClients = new Set();
+
+function broadcastSSE(event, data) {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(payload);
+    } catch (e) {
+      sseClients.delete(client);
+    }
+  }
+}
+
 /**
  * Get primary local LAN IPv4 address (e.g. 192.168.4.39)
  */
@@ -188,10 +224,54 @@ let lastCacheTime = 0;
 const CACHE_TTL_MS = 15000; // 15 seconds
 
 /**
+ * Real-time Server-Sent Events (SSE) stream for live heartbeats and instant shutdown alerts
+ */
+app.get('/api/stream', requirePinIfRemote, (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+
+  const device = getOrInitDevice();
+  res.write(`event: connected\ndata: ${JSON.stringify({
+    status: 'connected',
+    time: new Date().toISOString(),
+    deviceId: device.deviceId,
+    deviceName: device.deviceName
+  })}\n\n`);
+
+  // If an active shutdown intent was recently logged (within 3 minutes), push it immediately
+  const lastIntent = loadLastShutdownIntent();
+  if (lastIntent && lastIntent.timestamp && (Date.now() - new Date(lastIntent.timestamp).getTime() < 180000)) {
+    res.write(`event: shutdown_intent\ndata: ${JSON.stringify(lastIntent)}\n\n`);
+  }
+
+  sseClients.add(res);
+
+  req.on('close', () => {
+    sseClients.delete(res);
+  });
+});
+
+/**
+ * Endpoint to check current/latest shutdown intent
+ */
+app.get('/api/shutdown-intent', requirePinIfRemote, (req, res) => {
+  res.json(loadLastShutdownIntent() || { state: 'normal' });
+});
+
+/**
  * Health check endpoint
  */
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'pc-sentinel-server', time: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    service: 'pc-sentinel-server',
+    time: new Date().toISOString(),
+    uptime: os.uptime()
+  });
 });
 
 /**
@@ -698,6 +778,56 @@ app.listen(PORT, () => {
   console.log(` Local Dashboard: http://localhost:${PORT}`);
   console.log(`=================================================`);
 
+  // Start Heartbeat interval for active SSE clients (every 5 seconds)
+  setInterval(() => {
+    if (sseClients.size > 0) {
+      broadcastSSE('heartbeat', {
+        time: new Date().toISOString(),
+        uptime: os.uptime(),
+        activeClients: sseClients.size
+      });
+    }
+  }, 5000);
+
+  // Background Shutdown Sentinel: Check for impending Windows shutdown/restart every 2.5 seconds
+  let lastBroadcastedTimestamp = null;
+  setInterval(async () => {
+    try {
+      const intent = await runPowerShellScript('check-shutdown-intent.ps1', ['-WindowSeconds', '45']);
+      if (intent && intent.state && intent.timestamp !== lastBroadcastedTimestamp) {
+        lastBroadcastedTimestamp = intent.timestamp;
+        saveLastShutdownIntent(intent);
+        console.log(`[ShutdownSentinel] 🚨 DETECTED IMPENDING SHUTDOWN: ${intent.title}`);
+        broadcastSSE('shutdown_intent', intent);
+      }
+    } catch (e) {
+      // Non-blocking
+    }
+  }, 2500);
+
+  // Process Exit Handlers (Windows Shutdown / Service Stop Signals)
+  function handleExitSignal(signal) {
+    console.log(`[ShutdownSentinel] ⚠️ Intercepted OS signal: ${signal}`);
+    const intent = {
+      state: 'rebooting',
+      title: '🔄 System Shutdown Signal Received',
+      message: 'Windows has instructed services to stop. System is entering shutdown or reboot.',
+      willRestore: true,
+      timestamp: new Date().toISOString()
+    };
+    saveLastShutdownIntent(intent);
+    broadcastSSE('shutdown_intent', intent);
+
+    // Give 600ms grace period so packets are flushed through the network card
+    setTimeout(() => {
+      process.exit(0);
+    }, 600);
+  }
+
+  process.on('SIGINT', () => handleExitSignal('SIGINT'));
+  process.on('SIGTERM', () => handleExitSignal('SIGTERM'));
+  process.on('SIGBREAK', () => handleExitSignal('SIGBREAK'));
+
   // Start Background Firebase Cloud Heartbeat
   startFirebaseHeartbeat(async () => {
     try {
@@ -708,3 +838,4 @@ app.listen(PORT, () => {
     }
   });
 });
+

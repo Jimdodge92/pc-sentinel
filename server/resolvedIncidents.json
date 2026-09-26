@@ -1027,5 +1027,181 @@
     "resolutionNote": "Marked as resolved in PC Sentinel",
     "category": "hardware",
     "resolvedAt": "2026-09-26T19:46:49.011Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-19T14:20:08-05:00-106763",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-19T14:20:08-05:00-106755",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-16T16:52:37-05:00-106007",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-16T16:52:35-05:00-106005",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-16T16:52:34-05:00-105993",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-16T16:52:34-05:00-105991",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-16T16:52:32-05:00-105979",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-16T16:52:32-05:00-105975",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-16T16:47:13-05:00-105743",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-16T16:47:13-05:00-105744",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-16T16:47:13-05:00-105745",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-16T16:47:11-05:00-105740",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-16T16:47:10-05:00-105738",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-219-2026-09-19T14:20:09-05:00-106774",
+    "category": "hardware",
+    "title": "Microsoft-Windows-Kernel-PnP (Event 219)",
+    "resolvedAt": "2026-09-26T19:53:23.023Z"
+  },
+  {
+    "incidentId": "evt-System-10002-2026-09-17T20:44:34-05:00-106710",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-10002-2026-09-17T20:44:34-05:00-106710",
+    "category": "network",
+    "title": "Microsoft-Windows-WLAN-AutoConfig (Event 10002)",
+    "resolvedAt": "2026-09-26T19:53:33.726Z"
+  },
+  {
+    "incidentId": "evt-System-10002-2026-09-16T16:46:30-05:00-105704",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Resolved along with identical event evt-System-10002-2026-09-17T20:44:34-05:00-106710",
+    "category": "network",
+    "title": "Microsoft-Windows-WLAN-AutoConfig (Event 10002)",
+    "resolvedAt": "2026-09-26T19:53:33.726Z"
+  },
+  {
+    "incidentId": "evt-Application-1002-2026-09-16T16:25:08-05:00-13810",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "app",
+    "title": "Application Hang (Event 1002)",
+    "resolvedAt": "2026-09-26T19:53:43.580Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T14:47:02-05:00-108521",
+    "stepTitle": "No action required. This is standard Windows operational telemetry.",
+    "resolutionNote": "Resolved along with identical event evt-System-7040-2026-09-26T14:47:02-05:00-108521",
+    "category": "system",
+    "title": "Service Config: Background Intelligent Transfer Service",
+    "resolvedAt": "2026-09-26T19:54:10.659Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T14:44:57-05:00-108519",
+    "stepTitle": "No action required. This is standard Windows operational telemetry.",
+    "resolutionNote": "Resolved along with identical event evt-System-7040-2026-09-26T14:47:02-05:00-108521",
+    "category": "system",
+    "title": "Service Config: Background Intelligent Transfer Service",
+    "resolvedAt": "2026-09-26T19:54:10.659Z"
+  },
+  {
+    "incidentId": "evt-System-37-2026-09-26T14:46:28-05:00-108520",
+    "stepTitle": "No action required. This is standard Windows operational telemetry.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "system",
+    "title": "Microsoft-Windows-Time-Service (Event 37)",
+    "resolvedAt": "2026-09-26T19:54:16.958Z"
+  },
+  {
+    "incidentId": "evt-System-1801-2026-09-26T15:05:46-05:00-108785",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "system",
+    "title": "Microsoft-Windows-TPM-WMI (Event 1801)",
+    "resolvedAt": "2026-09-26T20:09:33.095Z"
+  },
+  {
+    "incidentId": "evt-Application-1023-2026-09-26T15:04:14-05:00-15713",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "app",
+    "title": "Microsoft-Windows-Perflib (Event 1023)",
+    "resolvedAt": "2026-09-26T20:38:21.394Z"
   }
 ]

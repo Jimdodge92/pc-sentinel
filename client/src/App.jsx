@@ -8,7 +8,8 @@ import DevicePairingModal from './components/DevicePairingModal';
 import MemoryDetailsModal from './components/MemoryDetailsModal';
 import {
   Search, CheckCircle2, AlertCircle, Power, Lock,
-  Smartphone, RefreshCw, Calendar, Trash2, Info
+  Smartphone, RefreshCw, Calendar, Trash2, Info,
+  Flame, ZapOff, Radio, RotateCw
 } from 'lucide-react';
 
 export default function App() {
@@ -27,6 +28,22 @@ export default function App() {
   // Cloud & Offline Detection State
   const [isOffline, setIsOffline] = useState(false);
   const [offlineInfo, setOfflineInfo] = useState(null);
+
+  // Live SSE Stream & Shutdown Intent Tracking
+  const [shutdownIntent, setShutdownIntent] = useState(() => {
+    try {
+      const stored = localStorage.getItem('sentinel_shutdown_intent');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.timestamp && (Date.now() - new Date(parsed.timestamp).getTime() < 600000)) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return null;
+  });
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [reconnectedToast, setReconnectedToast] = useState(null);
 
   // Security PIN State
   const [userPin, setUserPin] = useState(() => localStorage.getItem('pc_sentinel_pin') || '');
@@ -205,6 +222,89 @@ export default function App() {
   useEffect(() => {
     fetchDiagnostics();
   }, [daysFilter]);
+
+  // Live Server-Sent Events (SSE) Stream for real-time heartbeat and shutdown interceptor
+  useEffect(() => {
+    if (pinRequired) return;
+
+    let eventSource = null;
+    let pollTimer = null;
+    let isConnecting = false;
+
+    const connectSSE = () => {
+      if (isConnecting) return;
+      isConnecting = true;
+
+      const pinParam = userPin ? `?pin=${encodeURIComponent(userPin)}` : '';
+      const sseUrl = `/api/stream${pinParam}`;
+
+      try {
+        eventSource = new EventSource(sseUrl);
+
+        eventSource.addEventListener('connected', () => {
+          isConnecting = false;
+          setIsOffline(false);
+          setReconnectAttempt(0);
+        });
+
+        eventSource.addEventListener('heartbeat', () => {
+          setIsOffline(false);
+          setReconnectAttempt(0);
+        });
+
+        eventSource.addEventListener('shutdown_intent', (e) => {
+          try {
+            const intent = JSON.parse(e.data);
+            console.warn('[Sentinel SSE] 🚨 Intercepted impending shutdown:', intent);
+            setShutdownIntent(intent);
+            localStorage.setItem('sentinel_shutdown_intent', JSON.stringify(intent));
+          } catch (err) {}
+        });
+
+        eventSource.onerror = () => {
+          isConnecting = false;
+          setIsOffline(true);
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+
+          // Start polling /api/health to automatically reconnect when host completes reboot
+          if (!pollTimer) {
+            pollTimer = setInterval(async () => {
+              setReconnectAttempt(prev => prev + 1);
+              try {
+                const testRes = await fetch('/api/health', { signal: AbortSignal.timeout(2000) });
+                if (testRes.ok) {
+                  clearInterval(pollTimer);
+                  pollTimer = null;
+                  setShutdownIntent(null);
+                  localStorage.removeItem('sentinel_shutdown_intent');
+                  setIsOffline(false);
+                  setReconnectAttempt(0);
+                  setReconnectedToast('ThinkPad back online! Live telemetry refreshed.');
+                  setTimeout(() => setReconnectedToast(null), 6000);
+                  fetchDiagnostics(true);
+                  connectSSE();
+                }
+              } catch (e) {
+                // Host still booting/offline
+              }
+            }, 2500);
+          }
+        };
+      } catch (err) {
+        isConnecting = false;
+      }
+    };
+
+    connectSSE();
+
+    return () => {
+      if (eventSource) eventSource.close();
+      if (pollTimer) clearInterval(pollTimer);
+    };
+  }, [pinRequired, userPin]);
 
   const handlePinSubmit = async (e) => {
     e.preventDefault();
@@ -548,32 +648,136 @@ export default function App() {
           </div>
         ) : (
           <>
-            {/* Host Offline Banner */}
-            {isOffline && (
-              <div className="bg-gradient-to-r from-rose-950/70 via-slate-900 to-amber-950/40 border border-rose-500/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-rose-950/30">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
-                    <Power className="w-5 h-5 animate-pulse" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-white text-sm">Host Offline — Showing Last Recorded Telemetry</h3>
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">
-                        ThinkPad Powered Down
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      Your ThinkPad stopped communicating {offlineInfo?.ageMins ? `${offlineInfo.ageMins} minute(s) ago` : 'recently'} ({offlineInfo?.lastHeartbeat || 'Prior to shutdown'}).
-                      {incidents.length > 0 && incidents[0].severity === 'critical' ? (
-                        <span className="block mt-1 text-amber-300 font-medium">
-                          Pre-Shutdown Incident: {incidents[0].title}
-                        </span>
-                      ) : (
-                        ' Displaying preserved diagnostic state.'
-                      )}
-                    </p>
-                  </div>
+            {/* Reconnected Toast Alert */}
+            {reconnectedToast && (
+              <div className="bg-emerald-950/90 border border-emerald-500/80 text-emerald-200 rounded-xl p-4 flex items-center justify-between gap-3 shadow-xl shadow-emerald-950/40 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span className="text-sm font-bold text-white">{reconnectedToast}</span>
                 </div>
+                <button
+                  onClick={() => setReconnectedToast(null)}
+                  className="text-xs px-2.5 py-1 rounded bg-emerald-900/60 hover:bg-emerald-800 text-emerald-300 transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
+            {/* Smart Context-Aware Offline & Pre-Shutdown Banner */}
+            {isOffline && (
+              <div className="space-y-3">
+                {shutdownIntent?.state === 'rebooting' ? (
+                  /* User / Windows Update Restart */
+                  <div className="bg-gradient-to-r from-sky-950/90 via-slate-900 to-cyan-950/70 border border-cyan-500/70 rounded-2xl p-5 shadow-2xl shadow-cyan-950/50">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
+                        <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
+                      </div>
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h3 className="font-extrabold text-white text-base tracking-tight">
+                            {shutdownIntent.title || 'Host Reboot in Progress: User-Initiated Restart'}
+                          </h3>
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono animate-pulse">
+                            Rebooting ThinkPad
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          {shutdownIntent.message || 'Your ThinkPad is currently restarting. Connection will restore momentarily as Windows finishes booting.'}
+                        </p>
+                        <div className="pt-2 flex items-center gap-3 text-xs text-cyan-300/90 font-mono flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                            <span>Auto-reconnecting (Attempt #{reconnectAttempt})...</span>
+                          </div>
+                          <span>•</span>
+                          <span>Dashboard will automatically reload when Windows services resume</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : shutdownIntent?.state === 'thermal_trip' ? (
+                  /* ACPI Thermal Shutdown */
+                  <div className="bg-gradient-to-r from-rose-950/90 via-slate-900 to-red-950/80 border border-rose-500/80 rounded-2xl p-5 shadow-2xl shadow-rose-950/60">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-rose-500/20 border border-rose-500/50 flex items-center justify-center text-rose-400 shrink-0">
+                        <Flame className="w-6 h-6 text-rose-400 animate-bounce" />
+                      </div>
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h3 className="font-extrabold text-white text-base tracking-tight">
+                            {shutdownIntent.title || 'Emergency Thermal Shutdown in Progress'}
+                          </h3>
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-700 font-mono">
+                            ACPI Critical Limit Trip
+                          </span>
+                        </div>
+                        <p className="text-xs text-rose-200/95 leading-relaxed">
+                          {shutdownIntent.message || 'An emergency thermal shutdown was triggered to protect processor silicon. The ThinkPad will stay powered off until temperatures normalize.'}
+                        </p>
+                        <p className="text-[11px] text-slate-400 font-mono mt-1">
+                          Elevate laptop underside and ensure fan exhausts are unblocked before powering back on.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : shutdownIntent?.state === 'powering_off' ? (
+                  /* Clean Power Off */
+                  <div className="bg-gradient-to-r from-purple-950/90 via-slate-900 to-indigo-950/70 border border-purple-500/60 rounded-2xl p-5 shadow-2xl shadow-purple-950/50">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shrink-0">
+                        <Power className="w-6 h-6 text-purple-400" />
+                      </div>
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h3 className="font-extrabold text-white text-base tracking-tight">
+                            {shutdownIntent.title || 'Clean System Shutdown: User-Initiated Power Off'}
+                          </h3>
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-700 font-mono">
+                            Powered Off
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          {shutdownIntent.message || 'Your ThinkPad was cleanly shut down by the user. System will remain offline until manually powered on.'}
+                        </p>
+                        <div className="pt-2 flex items-center gap-2 text-xs text-purple-300/80 font-mono">
+                          <span>Polling host for next power-on (Attempt #{reconnectAttempt})</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Abrupt Loss / Hard Crash (No shutdown signal received) */
+                  <div className="bg-gradient-to-r from-amber-950/80 via-slate-900 to-rose-950/60 border border-amber-500/60 rounded-2xl p-5 shadow-2xl shadow-amber-950/40">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                        <ZapOff className="w-6 h-6 text-amber-400 animate-pulse" />
+                      </div>
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h3 className="font-extrabold text-white text-base tracking-tight">
+                            Abrupt Connection Loss — No Shutdown Signal Received
+                          </h3>
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800 font-mono">
+                            Sudden Drop
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Your ThinkPad severed communication abruptly with zero orderly shutdown intent received. Likely causes: Sudden power loss (unplugged or drained battery), instant kernel freeze (BSOD), or local Wi-Fi router drop.
+                        </p>
+                        <div className="pt-2 flex items-center gap-3 text-xs text-amber-300/90 font-mono flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                            <span>Monitoring for reboot (Attempt #{reconnectAttempt})...</span>
+                          </div>
+                          <span>•</span>
+                          <span>Full forensic crash analysis will execute automatically upon reconnection</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
