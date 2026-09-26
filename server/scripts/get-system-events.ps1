@@ -8,33 +8,33 @@ $startDate = (Get-Date).AddDays(-$Days)
 
 # 1. Target Event IDs across key critical providers
 $targetEvents = @(
-    # Shutdowns, Power, Sleep & Boot
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Power'; Id = @(41, 42, 86, 88, 107, 109, 506, 507) },
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Acpi'; Id = @(12, 13) },
-    @{ LogName = 'System'; ProviderName = 'EventLog'; Id = @(6005, 6006, 6008, 6013) },
+    # CRITICAL Emergency Shutdowns & Kernel Hardware Cuts (Never crowded out by sleep)
+    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Power'; Id = @(41, 86, 88) },
+    @{ LogName = 'System'; ProviderName = 'EventLog'; Id = @(6008) },
     @{ LogName = 'System'; ProviderName = 'User32'; Id = @(1074) },
-    # Blue Screens & Hardware
     @{ LogName = 'System'; ProviderName = 'BugCheck'; Id = @(1001) },
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WER-SystemErrorReporting'; Id = @(1001) },
-    @{ LogName = 'System'; ProviderName = 'Display'; Id = @(4101) },
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WHEA-Logger'; Id = @(17, 18, 19, 47) },
     @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Processor-Power'; Id = @(37) },
+    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WHEA-Logger'; Id = @(17, 18, 19, 47) },
     @{ LogName = 'System'; ProviderName = 'disk'; Id = @(7, 11, 153) },
     @{ LogName = 'System'; ProviderName = 'storahci'; Id = @(129, 153) },
     @{ LogName = 'System'; ProviderName = 'nvme'; Id = @(11, 153) },
+    @{ LogName = 'System'; ProviderName = 'Display'; Id = @(4101) },
+    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Resource-Exhaustion-Detector'; Id = @(2004) },
+    @{ LogName = 'Application'; ProviderName = 'Application Error'; Id = @(1000) },
+    @{ LogName = 'Application'; ProviderName = 'Application Hang'; Id = @(1002) },
+    # Routine Power, Sleep & Boot Events
+    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Power'; Id = @(42, 107, 109, 506, 507) },
+    @{ LogName = 'System'; ProviderName = 'EventLog'; Id = @(6005, 6006, 6013) },
+    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Acpi'; Id = @(12, 13) },
     # Driver & Device PnP
     @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-PnP'; Id = @(219, 400, 410, 420) },
-    # Memory exhaustion
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Resource-Exhaustion-Detector'; Id = @(2004) },
     # Windows Update
     @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WindowsUpdateClient'; Id = @(19, 20, 43) },
     # Service Control Manager
     @{ LogName = 'System'; ProviderName = 'Service Control Manager'; Id = @(7000, 7009, 7036, 7040) },
     # Network Link
     @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WLAN-AutoConfig'; Id = @(8001, 8002, 8003, 10002) },
-    # Application Crashes & Hangs
-    @{ LogName = 'Application'; ProviderName = 'Application Error'; Id = @(1000) },
-    @{ LogName = 'Application'; ProviderName = 'Application Hang'; Id = @(1002) },
+    # Application & Setup
     @{ LogName = 'Application'; ProviderName = 'Windows Error Reporting'; Id = @(1001) },
     @{ LogName = 'Application'; ProviderName = 'MsiInstaller'; Id = @(1033, 11707, 11708) }
 )
@@ -125,7 +125,11 @@ try {
     }
 } catch {}
 
-# Sort all collected events descending by timestamp and limit to MaxEvents
-$sorted = $results | Sort-Object -Property TimeCreated -Descending | Select-Object -First $MaxEvents
+# Ensure critical, error, and targeted events are NEVER truncated by routine logs
+$criticalAndTargeted = $results | Where-Object { $_.Level -le 3 -or $_.Id -in @(86, 88, 41, 1074, 6008, 1001, 37, 2004) }
+$infoLogs = $results | Where-Object { $_.Level -gt 3 -and $_.Id -notin @(86, 88, 41, 1074, 6008, 1001, 37, 2004) } | Select-Object -First 100
+
+$allCombined = @($criticalAndTargeted) + @($infoLogs)
+$sorted = $allCombined | Sort-Object -Property TimeCreated -Descending
 
 $sorted | ConvertTo-Json -Depth 4 -Compress

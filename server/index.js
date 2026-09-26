@@ -287,7 +287,7 @@ app.get('/api/storage-health', requirePinIfRemote, async (req, res) => {
  */
 async function getDiagnosticSnapshot(days = 14) {
   const [events, deviceStatus, storageData, systemSummary] = await Promise.all([
-    runPowerShellScript('get-system-events.ps1', ['-Days', days.toString(), '-MaxEvents', '100']),
+    runPowerShellScript('get-system-events.ps1', ['-Days', days.toString(), '-MaxEvents', '300']),
     runPowerShellScript('get-device-status.ps1'),
     runPowerShellScript('get-storage-reliability.ps1'),
     runPowerShellScript('get-system-summary.ps1')

@@ -422,23 +422,63 @@ function analyzeDiagnostics(events = [], deviceStatus = {}, storageData = {}, sy
           severity = 'warning';
         }
 
-        // Friendly title generation
+        let likelyCauses = severity === 'info'
+          ? ['Routine Windows operating system task or background service execution.']
+          : ['Driver or service encountered an operational condition or requested attention.'];
+        let remediationSteps = severity === 'info'
+          ? ['No action required. This is standard Windows operational telemetry.']
+          : ['Review technical details or check Windows Event Viewer if related to unexpected behavior.'];
+
+        // Friendly title & specific details generation
         let title = `${provider} (Event ${id})`;
-        if (id === 6013) title = `System Uptime Milestone`;
-        else if (id === 6005) title = `Windows Event Log Started (System Boot)`;
-        else if (id === 6006) title = `Windows Event Log Stopped (System Shutdown)`;
-        else if (id === 42) title = `System Entering Sleep State`;
-        else if (id === 107) title = `System Resumed from Sleep`;
-        else if (id === 7040) title = `Service Config: ${eventData.param1 || 'Windows Service'}`;
-        else if (id === 7036) title = `Service State: ${eventData.param1 || 'Windows Service'}`;
-        else if (id === 7000 || id === 7009) title = `Service Timeout/Failure: ${eventData.param1 || 'Windows Service'}`;
-        else if (id === 19) title = `Windows Update Installation Succeeded`;
-        else if (id === 20) title = `Windows Update Installation Failed`;
-        else if (id === 1033 || id === 11707) title = `Software Installation Completed`;
-        else if (provLower.includes('chromoting')) {
-          if (id === 1) title = `Remote Desktop: Client Connected`;
-          else if (id === 3) title = `Remote Desktop: Access Denied`;
-          else if (id === 4) title = `Remote Desktop: Channel Established`;
+        if (id === 6013) {
+          title = `System Uptime Milestone`;
+          likelyCauses = ['Windows periodic heartbeat tracking total uninterrupted operating time.'];
+          remediationSteps = ['No action required. System is running stably.'];
+        } else if (id === 6005) {
+          title = `Windows Event Log Started (System Boot)`;
+          likelyCauses = ['Operating system completed boot sequence and initialized event logging.'];
+          remediationSteps = ['No action required. System initialized successfully.'];
+        } else if (id === 6006) {
+          title = `Windows Event Log Stopped (System Shutdown)`;
+          likelyCauses = ['Operating system cleanly terminated services prior to power down.'];
+          remediationSteps = ['No action required. Clean system shutdown.'];
+        } else if (id === 42) {
+          title = `System Entering Sleep State`;
+          likelyCauses = ['Windows entered modern standby or ACPI sleep due to inactivity or lid close.'];
+          remediationSteps = ['No action required.'];
+        } else if (id === 107) {
+          title = `System Resumed from Sleep`;
+          likelyCauses = ['User opened laptop lid, pressed power button, or moved mouse to wake PC.'];
+          remediationSteps = ['No action required.'];
+        } else if (id === 7040) {
+          title = `Service Config: ${eventData.param1 || 'Windows Service'}`;
+        } else if (id === 7036) {
+          title = `Service State: ${eventData.param1 || 'Windows Service'}`;
+        } else if (id === 7000 || id === 7009) {
+          title = `Service Timeout/Failure: ${eventData.param1 || 'Windows Service'}`;
+        } else if (id === 19) {
+          title = `Windows Update Installation Succeeded`;
+        } else if (id === 20) {
+          title = `Windows Update Installation Failed`;
+        } else if (id === 1033 || id === 11707) {
+          title = `Software Installation Completed`;
+        } else if (provLower.includes('chromoting')) {
+          category = 'network';
+          severity = 'info';
+          if (id === 1) {
+            title = `Remote Desktop: Client Connected`;
+            likelyCauses = ['Authorized remote desktop connection initiated via Google Chrome Remote Desktop.'];
+            remediationSteps = ['No action required. Connection active.'];
+          } else if (id === 3) {
+            title = `Remote Desktop: Authentication Denied`;
+            likelyCauses = ['A client attempted to connect via Chrome Remote Desktop with an invalid PIN or expired session.'];
+            remediationSteps = ['If you attempted to connect, re-enter your Chrome Remote Desktop PIN. If unrecognized, check remotedesktop.google.com/access.'];
+          } else if (id === 4) {
+            title = `Remote Desktop: Channel Established`;
+            likelyCauses = ['Direct peer-to-peer or relay channel established.'];
+            remediationSteps = ['No action required.'];
+          }
         }
 
         const cleanMessage = (message || '').trim() || `Windows recorded event ID ${id} from provider '${provider}'.`;
@@ -450,12 +490,8 @@ function analyzeDiagnostics(events = [], deviceStatus = {}, storageData = {}, sy
           severity,
           title,
           description: cleanMessage,
-          likelyCauses: severity === 'info'
-            ? ['Routine Windows operating system task or background service execution.']
-            : ['Driver or service encountered an operational condition or requested attention.'],
-          remediationSteps: severity === 'info'
-            ? ['No action required. This is standard Windows operational telemetry.']
-            : ['Review technical details or check Windows Event Viewer if related to unexpected behavior.'],
+          likelyCauses,
+          remediationSteps,
           technicalDetails: {
             eventId: id,
             recordId: evt.RecordId,
