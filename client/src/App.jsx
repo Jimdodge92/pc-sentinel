@@ -4,10 +4,10 @@ import MetricsBar from './components/MetricsBar';
 import IncidentCard from './components/IncidentCard';
 import DiagnosisModal from './components/DiagnosisModal';
 import HardwareStatusCard from './components/HardwareStatusCard';
-import RemoteAccessModal from './components/RemoteAccessModal';
+import DevicePairingModal from './components/DevicePairingModal';
 import {
-  Search, Filter, CheckCircle2, AlertCircle, ShieldAlert,
-  Power, Monitor, HardDrive, Cpu, FileText, Calendar, Lock, Key, Globe, Github
+  Search, CheckCircle2, AlertCircle, Power, Lock,
+  Smartphone, RefreshCw, Calendar
 } from 'lucide-react';
 
 export default function App() {
@@ -16,12 +16,11 @@ export default function App() {
   const [error, setError] = useState(null);
   const [selectedIncident, setSelectedIncident] = useState(null);
 
-  // Network & Remote Access State
-  const [networkInfo, setNetworkInfo] = useState(null);
-  const [isRemoteModalOpen, setIsRemoteModalOpen] = useState(false);
+  // Device Pairing & Modal State
+  const [deviceInfo, setDeviceInfo] = useState(null);
+  const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
 
-  // Cloud Vault & Offline Detection State
-  const [cloudStatus, setCloudStatus] = useState(null);
+  // Cloud & Offline Detection State
   const [isOffline, setIsOffline] = useState(false);
   const [offlineInfo, setOfflineInfo] = useState(null);
 
@@ -38,28 +37,21 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [daysFilter, setDaysFilter] = useState(14);
 
-  const fetchNetworkInfo = async () => {
+  const fetchDeviceInfo = async () => {
     try {
-      const res = await fetch('/api/network-info');
+      const res = await fetch('/api/device/info');
       if (res.ok) {
         const json = await res.json();
-        setNetworkInfo(json);
-      }
-    } catch (e) {
-      console.warn('Failed to fetch network info:', e);
-    }
-
-    try {
-      const cRes = await fetch('/api/cloud/status');
-      if (cRes.ok) {
-        const cJson = await cRes.json();
-        setCloudStatus(cJson);
-        if (cJson.gistId) {
-          localStorage.setItem('sentinel_gist_id', cJson.gistId);
+        setDeviceInfo(json);
+        if (json.deviceId) {
+          localStorage.setItem('sentinel_device_id', json.deviceId);
+        }
+        if (json.firebaseConfig?.projectId) {
+          localStorage.setItem('sentinel_firebase_project', json.firebaseConfig.projectId);
         }
       }
     } catch (e) {
-      console.warn('Failed to fetch cloud status:', e);
+      console.warn('Failed to fetch device info:', e);
     }
   };
 
@@ -77,29 +69,53 @@ export default function App() {
       try {
         res = await fetch(url, { headers });
       } catch (networkErr) {
-        console.warn('Local host unreachable, attempting Cloud Vault fallback...', networkErr);
-        // Fallback to GitHub Cloud Vault
-        const gistId = localStorage.getItem('sentinel_gist_id') || cloudStatus?.gistId;
-        if (gistId) {
-          const gistRes = await fetch(`https://api.github.com/gists/${gistId}`);
-          if (gistRes.ok) {
-            const gistData = await gistRes.json();
-            const rawContent = gistData.files?.['sentinel_telemetry.json']?.content;
-            if (rawContent) {
-              const parsed = JSON.parse(rawContent);
-              const hbTime = parsed.heartbeatTime || parsed.scanTime;
-              const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
-              setIsOffline(true);
-              setOfflineInfo({
-                lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Unknown',
-                ageMins
-              });
-              setData(parsed);
-              setPinRequired(false);
-              return;
+        console.warn('Local host unreachable, checking cloud / offline cache...', networkErr);
+
+        // 1. Try Firebase Firestore Cloud Relay if configured
+        const projectId = localStorage.getItem('sentinel_firebase_project') || deviceInfo?.firebaseConfig?.projectId;
+        const deviceId = localStorage.getItem('sentinel_device_id') || deviceInfo?.deviceId;
+        if (projectId && deviceId) {
+          try {
+            const fbRes = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/devices/${deviceId}`);
+            if (fbRes.ok) {
+              const fbDoc = await fbRes.json();
+              const telemetryStr = fbDoc.fields?.telemetryJson?.stringValue;
+              if (telemetryStr) {
+                const parsed = JSON.parse(telemetryStr);
+                localStorage.setItem('sentinel_offline_cache', JSON.stringify(parsed));
+                const hbTime = parsed.scanTime;
+                const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
+                setIsOffline(true);
+                setOfflineInfo({
+                  lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Prior to shutdown',
+                  ageMins
+                });
+                setData(parsed);
+                setPinRequired(false);
+                return;
+              }
             }
+          } catch (fbErr) {
+            console.warn('Firestore fetch failed:', fbErr);
           }
         }
+
+        // 2. Fallback to Local Offline Cache (shows full app even if completely offline)
+        const cachedRaw = localStorage.getItem('sentinel_offline_cache');
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          const hbTime = cached.scanTime;
+          const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
+          setIsOffline(true);
+          setOfflineInfo({
+            lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Prior to shutdown',
+            ageMins
+          });
+          setData(cached);
+          setPinRequired(false);
+          return;
+        }
+
         throw networkErr;
       }
 
@@ -114,47 +130,46 @@ export default function App() {
       }
 
       const json = await res.json();
+      // Cache latest successful scan
+      localStorage.setItem('sentinel_offline_cache', JSON.stringify(json));
       setPinRequired(false);
       setIsOffline(false);
       setOfflineInfo(null);
       setData(json);
     } catch (err) {
       console.error('Failed to fetch diagnostics:', err);
-      // Fallback to GitHub Cloud Vault on error
-      const gistId = localStorage.getItem('sentinel_gist_id') || cloudStatus?.gistId;
-      if (gistId) {
-        try {
-          const gistRes = await fetch(`https://api.github.com/gists/${gistId}`);
-          if (gistRes.ok) {
-            const gistData = await gistRes.json();
-            const rawContent = gistData.files?.['sentinel_telemetry.json']?.content;
-            if (rawContent) {
-              const parsed = JSON.parse(rawContent);
-              const hbTime = parsed.heartbeatTime || parsed.scanTime;
-              const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
-              setIsOffline(true);
-              setOfflineInfo({
-                lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Unknown',
-                ageMins
-              });
-              setData(parsed);
-              setPinRequired(false);
-              setError(null);
-              return;
-            }
-          }
-        } catch (cloudErr) {
-          console.error('Cloud Vault fallback also failed:', cloudErr);
-        }
+
+      // Check offline cache on error
+      const cachedRaw = localStorage.getItem('sentinel_offline_cache');
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        const hbTime = cached.scanTime;
+        const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
+        setIsOffline(true);
+        setOfflineInfo({
+          lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Prior to shutdown',
+          ageMins
+        });
+        setData(cached);
+        setPinRequired(false);
+        setError(null);
+        return;
       }
-      setError('Unable to communicate with PC Sentinel Server. Ensure the backend is running or GitHub Cloud Vault is configured.');
+
+      setError('Unable to communicate with PC Sentinel Server. Ensure the desktop application is running.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchNetworkInfo();
+    // Check if opened via pairing link (?pair=SENT-XXXX)
+    const urlParams = new URLSearchParams(window.location.search);
+    const pairCode = urlParams.get('pair');
+    if (pairCode) {
+      localStorage.setItem('sentinel_device_id', pairCode);
+    }
+    fetchDeviceInfo();
   }, []);
 
   useEffect(() => {
@@ -236,7 +251,7 @@ export default function App() {
         loading={loading}
         onRefresh={() => fetchDiagnostics(true)}
         lastScanTime={data?.scanTime}
-        onOpenRemoteAccess={() => setIsRemoteModalOpen(true)}
+        onOpenRemoteAccess={() => setIsPairingModalOpen(true)}
         isOffline={isOffline}
       />
 
@@ -282,7 +297,7 @@ export default function App() {
           </div>
         ) : (
           <>
-            {/* Dead-Man's Switch Host Offline Banner */}
+            {/* Host Offline Banner */}
             {isOffline && (
               <div className="bg-gradient-to-r from-rose-950/70 via-slate-900 to-amber-950/40 border border-rose-500/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-rose-950/30">
                 <div className="flex items-start gap-3">
@@ -291,34 +306,23 @@ export default function App() {
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-white text-sm">Host Offline — Displaying Last Recorded Telemetry</h3>
+                      <h3 className="font-bold text-white text-sm">Host Offline — Showing Last Recorded Telemetry</h3>
                       <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">
                         ThinkPad Powered Down
                       </span>
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      Your ThinkPad stopped sending heartbeats {offlineInfo?.ageMins ? `${offlineInfo.ageMins} minute(s) ago` : 'recently'} ({offlineInfo?.lastHeartbeat || 'Prior to shutdown'}).
+                      Your ThinkPad stopped communicating {offlineInfo?.ageMins ? `${offlineInfo.ageMins} minute(s) ago` : 'recently'} ({offlineInfo?.lastHeartbeat || 'Prior to shutdown'}).
                       {incidents.length > 0 && incidents[0].severity === 'critical' ? (
                         <span className="block mt-1 text-amber-300 font-medium">
                           Pre-Shutdown Incident: {incidents[0].title}
                         </span>
                       ) : (
-                        ' System state preserved in GitHub Cloud Vault.'
+                        ' Displaying preserved diagnostic state.'
                       )}
                     </p>
                   </div>
                 </div>
-                {cloudStatus?.gistUrl && (
-                  <a
-                    href={cloudStatus.gistUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-3.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-purple-300 border border-purple-800/60 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0"
-                  >
-                    <Github className="w-3.5 h-3.5" />
-                    <span>View Cloud Gist</span>
-                  </a>
-                )}
               </div>
             )}
 
@@ -339,122 +343,122 @@ export default function App() {
               </div>
             )}
 
-        {/* Telemetry Metrics Bar */}
-        <MetricsBar
-          overallHealth={data?.overallHealth}
-          incidents={incidents}
-          systemSummary={data?.systemSummary}
-          storageData={data?.storageData}
-        />
-
-        {/* 3. Main Dashboard Layout (2 Columns: Incident Timeline + Hardware Specs) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left / Main Column: Incidents Feed (2 cols on lg) */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Filter & Search Bar */}
-            <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 space-y-3 backdrop-blur-sm">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                {/* Search Input */}
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search crashes, drivers, GPU errors, or symptoms..."
-                    className="w-full bg-slate-950/80 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
-                  />
-                </div>
-
-                {/* Days Filter */}
-                <div className="flex items-center gap-2 shrink-0 text-xs">
-                  <span className="text-slate-400 flex items-center gap-1 text-[11px]">
-                    <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                    Range:
-                  </span>
-                  <select
-                    value={daysFilter}
-                    onChange={(e) => setDaysFilter(Number(e.target.value))}
-                    className="bg-slate-950/80 border border-slate-800 text-slate-300 text-xs rounded-lg px-2.5 py-2 focus:outline-none focus:border-cyan-500 font-medium"
-                  >
-                    <option value={7}>Last 7 Days</option>
-                    <option value={14}>Last 14 Days</option>
-                    <option value={30}>Last 30 Days</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Category Filter Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-                {[
-                  { id: 'all', label: 'All Incidents', count: categoryCounts.all },
-                  { id: 'power', label: 'Shutdowns', count: categoryCounts.power },
-                  { id: 'gpu', label: 'GPU & Display', count: categoryCounts.gpu },
-                  { id: 'bsod', label: 'Blue Screens', count: categoryCounts.bsod },
-                  { id: 'thermal', label: 'Thermals', count: categoryCounts.thermal },
-                  { id: 'storage', label: 'Storage', count: categoryCounts.storage },
-                  { id: 'app', label: 'App Crashes', count: categoryCounts.app }
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveCategory(tab.id)}
-                    className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-all flex items-center gap-1.5 text-xs ${
-                      activeCategory === tab.id
-                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                        : 'bg-slate-950/50 hover:bg-slate-800 text-slate-400 border border-slate-800/80'
-                    }`}
-                  >
-                    <span>{tab.label}</span>
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                      activeCategory === tab.id ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'
-                    }`}>
-                      {tab.count}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Incident Cards List */}
-            <div className="space-y-3">
-              {loading && !data ? (
-                <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-12 text-center text-slate-400 space-y-3">
-                  <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="text-sm">Inspecting Windows Event Logs & Hardware Telemetry...</p>
-                </div>
-              ) : filteredIncidents.length === 0 ? (
-                <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-12 text-center text-slate-400 space-y-3">
-                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
-                    <CheckCircle2 className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-base font-bold text-white">No Incidents Found</h3>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    {searchQuery
-                      ? 'No events matched your search query. Try clearing the filter.'
-                      : `Your system has logged zero ${activeCategory === 'all' ? '' : activeCategory} issues within the selected ${daysFilter}-day window.`}
-                  </p>
-                </div>
-              ) : (
-                filteredIncidents.map(inc => (
-                  <IncidentCard
-                    key={inc.id}
-                    incident={inc}
-                    onSelect={setSelectedIncident}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Right Column: Hardware & Storage Live Monitor */}
-          <div className="space-y-6">
-            <HardwareStatusCard
-              deviceStatus={data?.deviceStatus}
-              storageData={data?.storageData}
+            {/* Telemetry Metrics Bar */}
+            <MetricsBar
+              overallHealth={data?.overallHealth}
+              incidents={incidents}
               systemSummary={data?.systemSummary}
+              storageData={data?.storageData}
             />
-          </div>
-        </div>
+
+            {/* 3. Main Dashboard Layout (2 Columns: Incident Timeline + Hardware Specs) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left / Main Column: Incidents Feed (2 cols on lg) */}
+              <div className="lg:col-span-2 space-y-4">
+                {/* Filter & Search Bar */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 space-y-3 backdrop-blur-sm">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    {/* Search Input */}
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search crashes, drivers, GPU errors, or symptoms..."
+                        className="w-full bg-slate-950/80 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
+                      />
+                    </div>
+
+                    {/* Days Filter */}
+                    <div className="flex items-center gap-2 shrink-0 text-xs">
+                      <span className="text-slate-400 flex items-center gap-1 text-[11px]">
+                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                        Range:
+                      </span>
+                      <select
+                        value={daysFilter}
+                        onChange={(e) => setDaysFilter(Number(e.target.value))}
+                        className="bg-slate-950/80 border border-slate-800 text-slate-300 text-xs rounded-lg px-2.5 py-2 focus:outline-none focus:border-cyan-500 font-medium"
+                      >
+                        <option value={7}>Last 7 Days</option>
+                        <option value={14}>Last 14 Days</option>
+                        <option value={30}>Last 30 Days</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Category Filter Pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+                    {[
+                      { id: 'all', label: 'All Incidents', count: categoryCounts.all },
+                      { id: 'power', label: 'Shutdowns', count: categoryCounts.power },
+                      { id: 'gpu', label: 'GPU & Display', count: categoryCounts.gpu },
+                      { id: 'bsod', label: 'Blue Screens', count: categoryCounts.bsod },
+                      { id: 'thermal', label: 'Thermals', count: categoryCounts.thermal },
+                      { id: 'storage', label: 'Storage', count: categoryCounts.storage },
+                      { id: 'app', label: 'App Crashes', count: categoryCounts.app }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveCategory(tab.id)}
+                        className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-all flex items-center gap-1.5 text-xs ${
+                          activeCategory === tab.id
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                            : 'bg-slate-950/50 hover:bg-slate-800 text-slate-400 border border-slate-800/80'
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                          activeCategory === tab.id ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {tab.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Incident Cards List */}
+                <div className="space-y-3">
+                  {loading && !data ? (
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-12 text-center text-slate-400 space-y-3">
+                      <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                      <p className="text-sm">Inspecting Windows Event Logs & Hardware Telemetry...</p>
+                    </div>
+                  ) : filteredIncidents.length === 0 ? (
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-12 text-center text-slate-400 space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
+                        <CheckCircle2 className="w-6 h-6" />
+                      </div>
+                      <h3 className="text-base font-bold text-white">No Incidents Found</h3>
+                      <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                        {searchQuery
+                          ? 'No events matched your search query. Try clearing the filter.'
+                          : `Your system has logged zero ${activeCategory === 'all' ? '' : activeCategory} issues within the selected ${daysFilter}-day window.`}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredIncidents.map(inc => (
+                      <IncidentCard
+                        key={inc.id}
+                        incident={inc}
+                        onSelect={setSelectedIncident}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Hardware & Storage Live Monitor */}
+              <div className="space-y-6">
+                <HardwareStatusCard
+                  deviceStatus={data?.deviceStatus}
+                  storageData={data?.storageData}
+                  systemSummary={data?.systemSummary}
+                />
+              </div>
+            </div>
           </>
         )}
       </main>
@@ -467,12 +471,11 @@ export default function App() {
         />
       )}
 
-      {/* 5. Off-Network Remote Access & Port Forwarding Modal */}
-      {isRemoteModalOpen && (
-        <RemoteAccessModal
-          networkInfo={networkInfo}
-          onClose={() => setIsRemoteModalOpen(false)}
-          onUpdateConfig={fetchNetworkInfo}
+      {/* 5. Device Pairing & Companion App Modal */}
+      {isPairingModalOpen && (
+        <DevicePairingModal
+          onClose={() => setIsPairingModalOpen(false)}
+          onRegenerate={(newInfo) => setDeviceInfo(newInfo)}
         />
       )}
     </div>

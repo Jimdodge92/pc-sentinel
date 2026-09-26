@@ -1,4 +1,6 @@
 {
   "pin": "",
-  "allowLocalBypass": true
+  "allowLocalBypass": true,
+  "deviceId": "SENT-2541",
+  "deviceName": "Jims-ThinkPad"
 }

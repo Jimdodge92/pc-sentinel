@@ -6,12 +6,13 @@ const os = require('os');
 const { execFile } = require('child_process');
 const { analyzeDiagnostics } = require('./diagnostics/incidentEngine');
 const {
-  getCloudStatus,
-  setupCloudVault,
-  pushTelemetryToGitHub,
-  startHeartbeatLoop,
-  triggerEmergencySync
-} = require('./cloudSync');
+  getOrInitDevice,
+  regenerateDeviceCode,
+  setFirebaseConfig,
+  pushToFirebase,
+  startFirebaseHeartbeat,
+  triggerEmergencyPush
+} = require('./devicePairing');
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -329,7 +330,7 @@ app.get('/api/diagnostics', requirePinIfRemote, async (req, res) => {
       inc => inc.category === 'thermal' && inc.severity === 'critical'
     );
     if (hasEmergency) {
-      triggerEmergencySync(cachedDiagnostics).catch(e => console.error('[CloudSync] Emergency push error:', e.message));
+      triggerEmergencyPush(cachedDiagnostics).catch(e => console.error('[FirebaseRelay] Emergency push error:', e.message));
     }
 
     res.json(cachedDiagnostics);
@@ -340,38 +341,59 @@ app.get('/api/diagnostics', requirePinIfRemote, async (req, res) => {
 });
 
 /**
- * Cloud Vault Status endpoint
+ * Device Pairing & Identity info
  */
-app.get('/api/cloud/status', (req, res) => {
-  res.json(getCloudStatus());
+app.get('/api/device/info', (req, res) => {
+  const device = getOrInitDevice();
+  const localIp = getLocalIp();
+  res.json({
+    ...device,
+    localIp,
+    port: PORT,
+    pairingUrl: `http://${localIp}:${PORT}?pair=${device.deviceId}`
+  });
 });
 
 /**
- * Configure GitHub Cloud Vault (token & optional gistId)
+ * Regenerate Device Pairing Code
  */
-app.post('/api/cloud/setup', requirePinIfRemote, async (req, res) => {
-  const { githubToken, gistId, autoSync } = req.body || {};
-  try {
-    const result = await setupCloudVault({ githubToken, gistId, autoSync });
+app.post('/api/device/regenerate-code', requirePinIfRemote, (req, res) => {
+  const newCode = regenerateDeviceCode();
+  const device = getOrInitDevice();
+  const localIp = getLocalIp();
+  res.json({
+    ...device,
+    deviceId: newCode,
+    pairingUrl: `http://${localIp}:${PORT}?pair=${newCode}`
+  });
+});
 
-    // Immediately push current snapshot to populate the newly linked Gist
-    getDiagnosticSnapshot().then(snapshot => {
-      pushTelemetryToGitHub(snapshot);
-    }).catch(err => console.error('[CloudSync] Initial sync error:', err.message));
-
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+/**
+ * Save Firebase Configuration
+ */
+app.post('/api/device/firebase-config', requirePinIfRemote, async (req, res) => {
+  const { projectId, apiKey, appId } = req.body || {};
+  if (!projectId) {
+    return res.status(400).json({ error: 'Firebase Project ID is required.' });
   }
+
+  setFirebaseConfig({ projectId, apiKey, appId });
+
+  // Immediately push telemetry to test connection
+  getDiagnosticSnapshot().then(snapshot => {
+    pushToFirebase(snapshot);
+  }).catch(e => console.error('[FirebaseRelay] Push error:', e.message));
+
+  res.json({ success: true, isCloudActive: true, projectId });
 });
 
 /**
- * Manually force immediate sync to GitHub Cloud Vault
+ * Manually force sync to Firebase Cloud
  */
-app.post('/api/cloud/sync-now', requirePinIfRemote, async (req, res) => {
+app.post('/api/device/sync-now', requirePinIfRemote, async (req, res) => {
   try {
     const snapshot = cachedDiagnostics || await getDiagnosticSnapshot();
-    const result = await pushTelemetryToGitHub(snapshot);
+    const result = await pushToFirebase(snapshot);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -397,12 +419,12 @@ app.listen(PORT, () => {
   console.log(` Local Dashboard: http://localhost:${PORT}`);
   console.log(`=================================================`);
 
-  // Start Background Cloud Telemetry Heartbeat Loop
-  startHeartbeatLoop(async () => {
+  // Start Background Firebase Cloud Heartbeat
+  startFirebaseHeartbeat(async () => {
     try {
       return cachedDiagnostics || await getDiagnosticSnapshot(7);
     } catch (e) {
-      console.error('[CloudSync] Heartbeat telemetry collection error:', e.message);
+      console.error('[FirebaseRelay] Heartbeat collection error:', e.message);
       return null;
     }
   });

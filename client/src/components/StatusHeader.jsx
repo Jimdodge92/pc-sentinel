@@ -86,11 +86,11 @@ export default function StatusHeader({ overallHealth, systemSummary, loading, on
 
           <button
             onClick={onOpenRemoteAccess}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg font-medium text-xs tracking-wide bg-slate-800/80 hover:bg-slate-700/80 text-cyan-300 border border-cyan-500/30 transition-all active:scale-95 shadow-sm"
-            title="Configure Off-Network Access & Port Forwarding"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-lg font-medium text-xs tracking-wide bg-gradient-to-r from-cyan-950/80 to-blue-950/80 hover:from-cyan-900/80 hover:to-blue-900/80 text-cyan-300 border border-cyan-500/40 transition-all active:scale-95 shadow-sm"
+            title="Pair with Phone or Companion App"
           >
-            <Globe className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Remote Access</span>
+            <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Pair Phone</span>
           </button>
 
           <button
