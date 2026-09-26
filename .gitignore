@@ -8,10 +8,11 @@ yarn-error.log*
 dist/
 build/
 
-# Environment
+# Environment & Secrets
 .env
 .env.local
 .env.*.local
+server/secrets.json
 
 # OS & Editor
 Thumbs.db

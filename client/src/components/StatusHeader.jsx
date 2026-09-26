@@ -1,8 +1,17 @@
 import React from 'react';
 import { Activity, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle, Monitor, Cpu, Clock, Laptop, Globe } from 'lucide-react';
 
-export default function StatusHeader({ overallHealth, systemSummary, loading, onRefresh, lastScanTime, onOpenRemoteAccess }) {
+export default function StatusHeader({ overallHealth, systemSummary, loading, onRefresh, lastScanTime, onOpenRemoteAccess, isOffline }) {
   const getStatusBadge = () => {
+    if (isOffline) {
+      return (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 font-medium text-sm">
+          <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
+          <span>Host Offline (Cloud Vault)</span>
+        </div>
+      );
+    }
+
     if (!overallHealth) return null;
     const status = overallHealth.status;
 

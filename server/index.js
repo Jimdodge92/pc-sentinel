@@ -5,6 +5,13 @@ const fs = require('fs');
 const os = require('os');
 const { execFile } = require('child_process');
 const { analyzeDiagnostics } = require('./diagnostics/incidentEngine');
+const {
+  getCloudStatus,
+  setupCloudVault,
+  pushTelemetryToGitHub,
+  startHeartbeatLoop,
+  triggerEmergencySync
+} = require('./cloudSync');
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -274,8 +281,32 @@ app.get('/api/storage-health', requirePinIfRemote, async (req, res) => {
 });
 
 /**
+ * Core Diagnostic Collector
+ * Collects events, hardware, and storage, runs the diagnostic engine, and returns complete analysis.
+ */
+async function getDiagnosticSnapshot(days = 14) {
+  const [events, deviceStatus, storageData, systemSummary] = await Promise.all([
+    runPowerShellScript('get-system-events.ps1', ['-Days', days.toString(), '-MaxEvents', '100']),
+    runPowerShellScript('get-device-status.ps1'),
+    runPowerShellScript('get-storage-reliability.ps1'),
+    runPowerShellScript('get-system-summary.ps1')
+  ]);
+
+  const diagnosis = analyzeDiagnostics(
+    events || [],
+    deviceStatus || {},
+    storageData || {},
+    systemSummary || {}
+  );
+
+  return {
+    scanTime: new Date().toISOString(),
+    ...diagnosis
+  };
+}
+
+/**
  * Full Diagnostics Endpoint
- * Collects events, hardware, and storage, runs the diagnostic engine, and returns plain-English results.
  */
 app.get('/api/diagnostics', requirePinIfRemote, async (req, res) => {
   const forceRefresh = req.query.refresh === 'true';
@@ -288,32 +319,61 @@ app.get('/api/diagnostics', requirePinIfRemote, async (req, res) => {
 
   try {
     console.log(`[PC Sentinel] Running diagnostic scan (Days: ${days})...`);
-
-    // Run parallel data collection
-    const [events, deviceStatus, storageData, systemSummary] = await Promise.all([
-      runPowerShellScript('get-system-events.ps1', ['-Days', days.toString(), '-MaxEvents', '100']),
-      runPowerShellScript('get-device-status.ps1'),
-      runPowerShellScript('get-storage-reliability.ps1'),
-      runPowerShellScript('get-system-summary.ps1')
-    ]);
-
-    const diagnosis = analyzeDiagnostics(
-      events || [],
-      deviceStatus || {},
-      storageData || {},
-      systemSummary || {}
-    );
-
-    cachedDiagnostics = {
-      scanTime: new Date().toISOString(),
-      ...diagnosis
-    };
+    cachedDiagnostics = await getDiagnosticSnapshot(days);
     lastCacheTime = now;
 
-    console.log(`[PC Sentinel] Scan complete. Found ${diagnosis.incidents.length} incident(s). Status: ${diagnosis.overallHealth.status}`);
+    console.log(`[PC Sentinel] Scan complete. Found ${cachedDiagnostics.incidents.length} incident(s). Status: ${cachedDiagnostics.overallHealth.status}`);
+
+    // If a critical thermal or emergency shutdown incident is active, trigger immediate emergency push
+    const hasEmergency = (cachedDiagnostics.incidents || []).some(
+      inc => inc.category === 'thermal' && inc.severity === 'critical'
+    );
+    if (hasEmergency) {
+      triggerEmergencySync(cachedDiagnostics).catch(e => console.error('[CloudSync] Emergency push error:', e.message));
+    }
+
     res.json(cachedDiagnostics);
   } catch (err) {
     console.error('[PC Sentinel] Diagnostics error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Cloud Vault Status endpoint
+ */
+app.get('/api/cloud/status', (req, res) => {
+  res.json(getCloudStatus());
+});
+
+/**
+ * Configure GitHub Cloud Vault (token & optional gistId)
+ */
+app.post('/api/cloud/setup', requirePinIfRemote, async (req, res) => {
+  const { githubToken, gistId, autoSync } = req.body || {};
+  try {
+    const result = await setupCloudVault({ githubToken, gistId, autoSync });
+
+    // Immediately push current snapshot to populate the newly linked Gist
+    getDiagnosticSnapshot().then(snapshot => {
+      pushTelemetryToGitHub(snapshot);
+    }).catch(err => console.error('[CloudSync] Initial sync error:', err.message));
+
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * Manually force immediate sync to GitHub Cloud Vault
+ */
+app.post('/api/cloud/sync-now', requirePinIfRemote, async (req, res) => {
+  try {
+    const snapshot = cachedDiagnostics || await getDiagnosticSnapshot();
+    const result = await pushTelemetryToGitHub(snapshot);
+    res.json(result);
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -336,4 +396,14 @@ app.listen(PORT, () => {
   console.log(` PC Sentinel Autonomous Server Active`);
   console.log(` Local Dashboard: http://localhost:${PORT}`);
   console.log(`=================================================`);
+
+  // Start Background Cloud Telemetry Heartbeat Loop
+  startHeartbeatLoop(async () => {
+    try {
+      return cachedDiagnostics || await getDiagnosticSnapshot(7);
+    } catch (e) {
+      console.error('[CloudSync] Heartbeat telemetry collection error:', e.message);
+      return null;
+    }
+  });
 });

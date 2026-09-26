@@ -7,7 +7,7 @@ import HardwareStatusCard from './components/HardwareStatusCard';
 import RemoteAccessModal from './components/RemoteAccessModal';
 import {
   Search, Filter, CheckCircle2, AlertCircle, ShieldAlert,
-  Power, Monitor, HardDrive, Cpu, FileText, Calendar, Lock, Key, Globe
+  Power, Monitor, HardDrive, Cpu, FileText, Calendar, Lock, Key, Globe, Github
 } from 'lucide-react';
 
 export default function App() {
@@ -19,6 +19,11 @@ export default function App() {
   // Network & Remote Access State
   const [networkInfo, setNetworkInfo] = useState(null);
   const [isRemoteModalOpen, setIsRemoteModalOpen] = useState(false);
+
+  // Cloud Vault & Offline Detection State
+  const [cloudStatus, setCloudStatus] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
+  const [offlineInfo, setOfflineInfo] = useState(null);
 
   // Security PIN State
   const [userPin, setUserPin] = useState(() => localStorage.getItem('pc_sentinel_pin') || '');
@@ -43,6 +48,19 @@ export default function App() {
     } catch (e) {
       console.warn('Failed to fetch network info:', e);
     }
+
+    try {
+      const cRes = await fetch('/api/cloud/status');
+      if (cRes.ok) {
+        const cJson = await cRes.json();
+        setCloudStatus(cJson);
+        if (cJson.gistId) {
+          localStorage.setItem('sentinel_gist_id', cJson.gistId);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch cloud status:', e);
+    }
   };
 
   const fetchDiagnostics = async (forceRefresh = false, activePin = userPin) => {
@@ -55,7 +73,35 @@ export default function App() {
         headers['x-sentinel-pin'] = activePin;
       }
 
-      const res = await fetch(url, { headers });
+      let res;
+      try {
+        res = await fetch(url, { headers });
+      } catch (networkErr) {
+        console.warn('Local host unreachable, attempting Cloud Vault fallback...', networkErr);
+        // Fallback to GitHub Cloud Vault
+        const gistId = localStorage.getItem('sentinel_gist_id') || cloudStatus?.gistId;
+        if (gistId) {
+          const gistRes = await fetch(`https://api.github.com/gists/${gistId}`);
+          if (gistRes.ok) {
+            const gistData = await gistRes.json();
+            const rawContent = gistData.files?.['sentinel_telemetry.json']?.content;
+            if (rawContent) {
+              const parsed = JSON.parse(rawContent);
+              const hbTime = parsed.heartbeatTime || parsed.scanTime;
+              const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
+              setIsOffline(true);
+              setOfflineInfo({
+                lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Unknown',
+                ageMins
+              });
+              setData(parsed);
+              setPinRequired(false);
+              return;
+            }
+          }
+        }
+        throw networkErr;
+      }
 
       if (res.status === 401) {
         setPinRequired(true);
@@ -69,10 +115,39 @@ export default function App() {
 
       const json = await res.json();
       setPinRequired(false);
+      setIsOffline(false);
+      setOfflineInfo(null);
       setData(json);
     } catch (err) {
       console.error('Failed to fetch diagnostics:', err);
-      setError('Unable to communicate with PC Sentinel Server. Ensure the backend server is running.');
+      // Fallback to GitHub Cloud Vault on error
+      const gistId = localStorage.getItem('sentinel_gist_id') || cloudStatus?.gistId;
+      if (gistId) {
+        try {
+          const gistRes = await fetch(`https://api.github.com/gists/${gistId}`);
+          if (gistRes.ok) {
+            const gistData = await gistRes.json();
+            const rawContent = gistData.files?.['sentinel_telemetry.json']?.content;
+            if (rawContent) {
+              const parsed = JSON.parse(rawContent);
+              const hbTime = parsed.heartbeatTime || parsed.scanTime;
+              const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
+              setIsOffline(true);
+              setOfflineInfo({
+                lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Unknown',
+                ageMins
+              });
+              setData(parsed);
+              setPinRequired(false);
+              setError(null);
+              return;
+            }
+          }
+        } catch (cloudErr) {
+          console.error('Cloud Vault fallback also failed:', cloudErr);
+        }
+      }
+      setError('Unable to communicate with PC Sentinel Server. Ensure the backend is running or GitHub Cloud Vault is configured.');
     } finally {
       setLoading(false);
     }
@@ -162,6 +237,7 @@ export default function App() {
         onRefresh={() => fetchDiagnostics(true)}
         lastScanTime={data?.scanTime}
         onOpenRemoteAccess={() => setIsRemoteModalOpen(true)}
+        isOffline={isOffline}
       />
 
       {/* 2. Main Content Container */}
@@ -206,6 +282,46 @@ export default function App() {
           </div>
         ) : (
           <>
+            {/* Dead-Man's Switch Host Offline Banner */}
+            {isOffline && (
+              <div className="bg-gradient-to-r from-rose-950/70 via-slate-900 to-amber-950/40 border border-rose-500/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-rose-950/30">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+                    <Power className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-white text-sm">Host Offline — Displaying Last Recorded Telemetry</h3>
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">
+                        ThinkPad Powered Down
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Your ThinkPad stopped sending heartbeats {offlineInfo?.ageMins ? `${offlineInfo.ageMins} minute(s) ago` : 'recently'} ({offlineInfo?.lastHeartbeat || 'Prior to shutdown'}).
+                      {incidents.length > 0 && incidents[0].severity === 'critical' ? (
+                        <span className="block mt-1 text-amber-300 font-medium">
+                          Pre-Shutdown Incident: {incidents[0].title}
+                        </span>
+                      ) : (
+                        ' System state preserved in GitHub Cloud Vault.'
+                      )}
+                    </p>
+                  </div>
+                </div>
+                {cloudStatus?.gistUrl && (
+                  <a
+                    href={cloudStatus.gistUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-purple-300 border border-purple-800/60 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0"
+                  >
+                    <Github className="w-3.5 h-3.5" />
+                    <span>View Cloud Gist</span>
+                  </a>
+                )}
+              </div>
+            )}
+
             {/* Error Alert */}
             {error && (
               <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-center gap-3 text-rose-300 text-sm">
