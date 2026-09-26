@@ -296,6 +296,28 @@ export default function App() {
     };
   }, [incidents]);
 
+  // Map to count identical events across the active feed
+  const identicalCountMap = useMemo(() => {
+    const counts = {};
+    for (const inc of incidents) {
+      const isTargetPnPOrEvent = inc.technicalDetails?.eventId && inc.technicalDetails?.provider;
+      const key = isTargetPnPOrEvent
+        ? `${inc.technicalDetails.provider}:${inc.technicalDetails.eventId}:${inc.title}`
+        : `${inc.title}:${inc.category}`;
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    return counts;
+  }, [incidents]);
+
+  const getIdenticalCount = (inc) => {
+    if (!inc) return 1;
+    const isTargetPnPOrEvent = inc.technicalDetails?.eventId && inc.technicalDetails?.provider;
+    const key = isTargetPnPOrEvent
+      ? `${inc.technicalDetails.provider}:${inc.technicalDetails.eventId}:${inc.title}`
+      : `${inc.title}:${inc.category}`;
+    return identicalCountMap[key] || 1;
+  };
+
   // 1-Click Jump to Latest Critical Event or Warning
   const jumpToLatestIncident = () => {
     if (!incidents || incidents.length === 0) return;
@@ -329,9 +351,28 @@ export default function App() {
     }
   };
 
-  // Permanently clear an incident upon user confirmation of resolution
-  const handleResolveIncident = async (incidentId, stepTitle) => {
+  // Permanently clear an incident and all identical events upon user confirmation of resolution
+  const handleResolveIncident = async (incidentId, stepTitle, targetIncident) => {
     try {
+      const inc = targetIncident || (data?.incidents || []).find(i => i.id === incidentId);
+      const isTargetPnPOrEvent = inc?.technicalDetails?.eventId && inc?.technicalDetails?.provider;
+
+      // Find all identical incidents currently present
+      const matchingIncidents = (data?.incidents || []).filter(other => {
+        if (other.id === incidentId) return true;
+        if (!inc) return false;
+        if (isTargetPnPOrEvent) {
+          return (
+            other.technicalDetails?.eventId === inc.technicalDetails.eventId &&
+            other.technicalDetails?.provider === inc.technicalDetails.provider &&
+            other.title === inc.title
+          );
+        }
+        return other.title === inc.title && other.category === inc.category;
+      });
+
+      const matchingIds = matchingIncidents.map(m => m.id);
+
       const headers = { 'Content-Type': 'application/json' };
       if (userPin) {
         headers['x-sentinel-pin'] = userPin;
@@ -344,25 +385,26 @@ export default function App() {
           headers,
           body: JSON.stringify({
             incidentId,
+            matchingIds,
+            clearIdentical: true,
             stepTitle,
-            category: selectedIncident?.category || 'general'
+            category: inc?.category || 'general'
           })
         });
       } catch (apiErr) {
         console.warn('Backend resolve API call failed, proceeding with client-side clearance:', apiErr);
       }
 
-      // 2. Persist to localStorage
+      // 2. Persist all matching IDs to localStorage
       const localResolved = JSON.parse(localStorage.getItem('sentinel_resolved_incidents') || '[]');
-      if (!localResolved.includes(incidentId)) {
-        localResolved.push(incidentId);
-        localStorage.setItem('sentinel_resolved_incidents', JSON.stringify(localResolved));
-      }
+      const updatedResolved = Array.from(new Set([...localResolved, ...matchingIds]));
+      localStorage.setItem('sentinel_resolved_incidents', JSON.stringify(updatedResolved));
 
-      // 3. Immediately clear from active data state & re-evaluate overall health
+      // 3. Immediately clear all matching events from active data state & re-evaluate overall health
+      const matchingIdsSet = new Set(matchingIds);
       setData(prev => {
         if (!prev) return prev;
-        const remainingIncidents = (prev.incidents || []).filter(i => i.id !== incidentId);
+        const remainingIncidents = (prev.incidents || []).filter(i => !matchingIdsSet.has(i.id));
         const hasCritical = remainingIncidents.some(i => i.severity === 'critical');
         const hasWarning = remainingIncidents.some(i => i.severity === 'warning');
 
@@ -393,10 +435,10 @@ export default function App() {
         return updatedData;
       });
 
-      return true;
+      return { success: true, clearedCount: matchingIds.length };
     } catch (err) {
       console.error('Failed to resolve incident:', err);
-      return false;
+      return { success: false, clearedCount: 1 };
     }
   };
 
@@ -726,6 +768,7 @@ export default function App() {
                       <IncidentCard
                         key={inc.id}
                         incident={inc}
+                        identicalCount={getIdenticalCount(inc)}
                         onSelect={setSelectedIncident}
                       />
                     ))
@@ -750,6 +793,7 @@ export default function App() {
       {selectedIncident && (
         <DiagnosisModal
           incident={selectedIncident}
+          allIncidents={data?.incidents || []}
           onClose={() => setSelectedIncident(null)}
           onResolveIncident={handleResolveIncident}
         />

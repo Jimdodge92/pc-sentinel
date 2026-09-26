@@ -5,7 +5,7 @@ import {
   Wifi, Server, Layers, ShieldCheck, Usb
 } from 'lucide-react';
 
-export default function IncidentCard({ incident, onSelect }) {
+export default function IncidentCard({ incident, identicalCount = 1, onSelect }) {
   const getCategoryIcon = (category) => {
     switch (category) {
       case 'power': return <Power className="w-4 h-4 text-rose-400" />;
@@ -88,6 +88,11 @@ export default function IncidentCard({ incident, onSelect }) {
             <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">
               {incident.category}
             </span>
+            {identicalCount > 1 && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 font-mono">
+                {identicalCount} events
+              </span>
+            )}
           </div>
           <span className="text-xs text-slate-400 font-mono">
             {formatRelativeTime(incident.timestamp)}

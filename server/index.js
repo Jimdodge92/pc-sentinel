@@ -413,34 +413,68 @@ app.get('/api/system/top-memory', requirePinIfRemote, async (req, res) => {
 
 /**
  * Mark Incident as Resolved (clears permanently from active log and surviving rescans)
+ * Automatically clears all identical events matching the same title/provider/eventId
  */
 app.post('/api/incidents/resolve', requirePinIfRemote, (req, res) => {
-  const { incidentId, stepTitle, resolutionNote, category } = req.body || {};
+  const { incidentId, stepTitle, resolutionNote, category, matchingIds, clearIdentical = true } = req.body || {};
   if (!incidentId) {
     return res.status(400).json({ error: 'incidentId is required' });
   }
 
   const resolved = loadResolvedIncidents();
-  const existingIndex = resolved.findIndex(r => r.incidentId === incidentId);
+  const existingSet = new Set(resolved.map(r => r.incidentId));
+  const now = new Date().toISOString();
 
-  const record = {
-    incidentId,
-    stepTitle: stepTitle || 'User confirmed fix step resolved issue',
-    resolutionNote: resolutionNote || 'Marked as resolved in PC Sentinel',
-    category: category || 'general',
-    resolvedAt: new Date().toISOString()
-  };
+  // Find target incident from cache
+  const targetIncident = cachedDiagnostics?.incidents?.find(i => i.id === incidentId);
 
-  if (existingIndex >= 0) {
-    resolved[existingIndex] = record;
-  } else {
-    resolved.push(record);
+  // Collect all IDs to resolve
+  const idsToResolve = [incidentId];
+
+  // If frontend passed matchingIds array, include them
+  if (Array.isArray(matchingIds)) {
+    for (const mId of matchingIds) {
+      if (!idsToResolve.includes(mId)) idsToResolve.push(mId);
+    }
+  }
+
+  // Also inspect cachedDiagnostics for any other identical events
+  if (clearIdentical && targetIncident && Array.isArray(cachedDiagnostics?.incidents)) {
+    const isTargetPnPOrEvent = targetIncident.technicalDetails?.eventId && targetIncident.technicalDetails?.provider;
+    for (const other of cachedDiagnostics.incidents) {
+      if (idsToResolve.includes(other.id)) continue;
+
+      const isIdentical =
+        (isTargetPnPOrEvent &&
+         other.technicalDetails?.eventId === targetIncident.technicalDetails.eventId &&
+         other.technicalDetails?.provider === targetIncident.technicalDetails.provider &&
+         other.title === targetIncident.title) ||
+        (!isTargetPnPOrEvent && other.title && other.title === targetIncident.title && other.category === targetIncident.category);
+
+      if (isIdentical) {
+        idsToResolve.push(other.id);
+      }
+    }
+  }
+
+  for (const id of idsToResolve) {
+    if (!existingSet.has(id)) {
+      resolved.push({
+        incidentId: id,
+        stepTitle: stepTitle || 'User confirmed fix step resolved issue',
+        resolutionNote: resolutionNote || (idsToResolve.length > 1 ? `Resolved along with identical event ${incidentId}` : 'Marked as resolved in PC Sentinel'),
+        category: category || targetIncident?.category || 'general',
+        title: targetIncident?.title,
+        resolvedAt: now
+      });
+      existingSet.add(id);
+    }
   }
   saveResolvedIncidents(resolved);
 
   // Invalidate cache and update cached diagnostics immediately
   if (cachedDiagnostics && Array.isArray(cachedDiagnostics.incidents)) {
-    cachedDiagnostics.incidents = cachedDiagnostics.incidents.filter(i => i.id !== incidentId);
+    cachedDiagnostics.incidents = cachedDiagnostics.incidents.filter(i => !existingSet.has(i.id));
     const hasCritical = cachedDiagnostics.incidents.some(i => i.severity === 'critical');
     const hasWarning = cachedDiagnostics.incidents.some(i => i.severity === 'warning');
 
@@ -464,8 +498,12 @@ app.post('/api/incidents/resolve', requirePinIfRemote, (req, res) => {
 
   res.json({
     success: true,
-    message: 'Incident marked as resolved and permanently cleared from active logs.',
+    message: idsToResolve.length > 1
+      ? `Incident and ${idsToResolve.length - 1} identical events marked as resolved and permanently cleared.`
+      : 'Incident marked as resolved and permanently cleared from active logs.',
     resolvedId: incidentId,
+    resolvedIds: idsToResolve,
+    clearedCount: idsToResolve.length,
     activeIncidentsCount: cachedDiagnostics ? cachedDiagnostics.incidents.length : undefined,
     overallHealth: cachedDiagnostics ? cachedDiagnostics.overallHealth : undefined
   });

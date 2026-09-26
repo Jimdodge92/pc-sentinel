@@ -26,5 +26,1006 @@
     "resolutionNote": "Marked as resolved in PC Sentinel",
     "category": "power",
     "resolvedAt": "2026-09-26T19:39:26.489Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-26T14:31:42-05:00-108518",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-26T14:31:28-05:00-108517",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T14:27:10-05:00-108514",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T14:25:00-05:00-108513",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-3-2026-09-26T13:35:08-05:00-15634",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-3-2026-09-26T13:35:01-05:00-15633",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T12:48:41-05:00-108510",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T12:46:37-05:00-108509",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T07:47:00-05:00-108505",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T07:44:54-05:00-108504",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T06:49:33-05:00-108501",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T06:47:16-05:00-108486",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-26T06:13:28-05:00-108485",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-26T06:13:15-05:00-108484",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-26T03:51:14-05:00-108482",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-26T03:51:01-05:00-108481",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T03:39:51-05:00-108479",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T03:37:23-05:00-108464",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T00:46:56-05:00-108461",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-26T00:44:50-05:00-108460",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T20:57:24-05:00-108457",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T20:55:18-05:00-108456",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T20:49:36-05:00-108455",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T20:47:16-05:00-108440",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T18:08:42-05:00-108437",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T18:06:37-05:00-108436",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-25T17:50:12-05:00-108435",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-25T17:49:48-05:00-108434",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T17:47:06-05:00-108432",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T17:44:59-05:00-108431",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T17:09:11-05:00-108430",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T17:07:06-05:00-108429",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-25T14:31:35-05:00-108426",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-25T14:31:24-05:00-108425",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T10:46:50-05:00-108419",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T10:44:45-05:00-108418",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-7040-2026-09-25T09:50:08-05:00-108417",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-25T03:51:11-05:00-108379",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-25T03:51:00-05:00-108378",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-24T15:30:39-05:00-108307",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-24T15:30:39-05:00-108306",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-24T14:31:39-05:00-108226",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-24T14:31:28-05:00-108225",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6013-2026-09-24T12:00:01-05:00-108202",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-23T19:48:25-05:00-107984",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-23T19:48:07-05:00-107983",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-23T14:31:38-05:00-107746",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-23T14:31:26-05:00-107745",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6013-2026-09-23T12:00:01-05:00-107699",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-23T09:29:51-05:00-15128",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-23T09:29:50-05:00-15127",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-23T09:29:50-05:00-15126",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-22T23:29:27-05:00-15066",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-22T23:29:26-05:00-15065",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-22T23:29:26-05:00-15064",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-22T19:41:22-05:00-107540",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-22T19:41:08-05:00-107539",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-22T14:31:49-05:00-107511",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-22T14:31:38-05:00-107510",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-22T13:29:14-05:00-14995",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-22T13:29:13-05:00-14993",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-22T13:29:13-05:00-14994",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6013-2026-09-22T12:00:01-05:00-107505",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-22T07:15:15-05:00-107494",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-22T07:14:58-05:00-107493",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-22T03:51:20-05:00-107488",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-22T03:51:05-05:00-107487",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-22T03:28:58-05:00-14818",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-22T03:28:57-05:00-14816",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-22T03:28:57-05:00-14817",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-19-2026-09-22T01:06:47-05:00-107448",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-43-2026-09-22T01:06:43-05:00-107438",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-21T17:29:28-05:00-14731",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-21T17:29:28-05:00-14729",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-21T17:29:28-05:00-14730",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6013-2026-09-21T12:00:01-05:00-107370",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6013-2026-09-20T12:00:00-05:00-107173",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-20T05:05:12-05:00-14509",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-20T05:04:49-05:00-14508",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-19T22:48:33-05:00-14466",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-1000-2026-09-19T22:48:29-05:00",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-19T19:59:04-05:00-14461",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-19T18:32:53-05:00-14445",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-19T18:14:06-05:00-14442",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6013-2026-09-19T14:20:18-05:00-106709",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6005-2026-09-19T14:20:18-05:00-106708",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-109-2026-09-17T20:44:38-05:00-106712",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6006-2026-09-17T20:44:33-05:00-106697",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-507-2026-09-17T16:10:35-05:00-106627",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-506-2026-09-17T16:09:31-05:00-106612",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-507-2026-09-17T16:09:31-05:00-106610",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-506-2026-09-17T16:09:18-05:00-106602",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-506-2026-09-17T16:09:01-05:00-106581",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-507-2026-09-17T16:09:01-05:00-106583",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-107-2026-09-17T15:59:06-05:00-106567",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-42-2026-09-17T15:59:04-05:00-106566",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-507-2026-09-17T15:58:59-05:00-106553",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6013-2026-09-17T15:58:59-05:00-106549",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-507-2026-09-17T09:52:18-05:00-106535",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-506-2026-09-17T09:52:18-05:00-106537",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-506-2026-09-17T08:58:20-05:00-106519",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-16T17:30:56-05:00-14085",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-16T17:30:44-05:00-14083",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-16T17:30:44-05:00-14084",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-16T17:30:44-05:00-14082",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-16T17:30:44-05:00-14081",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6005-2026-09-16T16:52:45-05:00-105936",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6013-2026-09-16T16:52:45-05:00-105937",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6006-2026-09-16T16:52:03-05:00-105931",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-109-2026-09-16T16:52:03-05:00-105938",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-1074-2026-09-16T16:52:02-05:00",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6005-2026-09-16T16:47:20-05:00-105699",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6013-2026-09-16T16:47:20-05:00-105700",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-109-2026-09-16T16:46:33-05:00-105706",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6006-2026-09-16T16:46:29-05:00-105683",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-16T16:26:31-05:00-13813",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-16T16:26:31-05:00-13814",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-16T16:25:10-05:00-13811",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-Application-1001-2026-09-16T16:25:08-05:00-13809",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-507-2026-09-16T16:20:53-05:00-105543",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-506-2026-09-16T16:20:47-05:00-105541",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-507-2026-09-16T16:20:42-05:00-105537",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-506-2026-09-16T16:20:38-05:00-105535",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-507-2026-09-16T16:20:38-05:00-105533",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-507-2026-09-16T16:20:23-05:00-105520",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-506-2026-09-16T16:20:23-05:00-105522",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-506-2026-09-16T16:20:19-05:00-105510",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-507-2026-09-16T16:18:28-05:00-105464",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-506-2026-09-16T16:18:10-05:00-105452",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-507-2026-09-16T16:17:30-05:00-105437",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-506-2026-09-16T16:17:29-05:00-105431",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-System-6013-2026-09-16T16:17:28-05:00-105412",
+    "stepTitle": "Cleared all info logs",
+    "resolutionNote": "Batch cleared info logs in PC Sentinel",
+    "category": "info",
+    "resolvedAt": "2026-09-26T19:45:03.739Z"
+  },
+  {
+    "incidentId": "evt-37-2026-09-25T14:21:23-05:00",
+    "stepTitle": "Open display lid when docked: If using an external monitor/dock with the laptop lid closed, open the display—ThinkPads dissipate significant ambient heat upward through the keyboard deck.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "thermal",
+    "resolvedAt": "2026-09-26T19:45:35.790Z"
+  },
+  {
+    "incidentId": "evt-37-2026-09-24T14:21:23-05:00",
+    "stepTitle": "Open display lid when docked: If using an external monitor/dock with the laptop lid closed, open the display—ThinkPads dissipate significant ambient heat upward through the keyboard deck.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "thermal",
+    "resolvedAt": "2026-09-26T19:45:52.231Z"
+  },
+  {
+    "incidentId": "evt-37-2026-09-23T14:21:22-05:00",
+    "stepTitle": "Open display lid when docked: If using an external monitor/dock with the laptop lid closed, open the display—ThinkPads dissipate significant ambient heat upward through the keyboard deck.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "thermal",
+    "resolvedAt": "2026-09-26T19:45:59.478Z"
+  },
+  {
+    "incidentId": "evt-37-2026-09-22T14:21:21-05:00",
+    "stepTitle": "Open display lid when docked: If using an external monitor/dock with the laptop lid closed, open the display—ThinkPads dissipate significant ambient heat upward through the keyboard deck.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "thermal",
+    "resolvedAt": "2026-09-26T19:46:07.259Z"
+  },
+  {
+    "incidentId": "evt-37-2026-09-21T14:21:20-05:00",
+    "stepTitle": "Open display lid when docked: If using an external monitor/dock with the laptop lid closed, open the display—ThinkPads dissipate significant ambient heat upward through the keyboard deck.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "thermal",
+    "resolvedAt": "2026-09-26T19:46:13.494Z"
+  },
+  {
+    "incidentId": "evt-37-2026-09-20T14:21:19-05:00",
+    "stepTitle": "Open display lid when docked: If using an external monitor/dock with the laptop lid closed, open the display—ThinkPads dissipate significant ambient heat upward through the keyboard deck.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "thermal",
+    "resolvedAt": "2026-09-26T19:46:17.500Z"
+  },
+  {
+    "incidentId": "evt-37-2026-09-19T14:21:20-05:00",
+    "stepTitle": "Open display lid when docked: If using an external monitor/dock with the laptop lid closed, open the display—ThinkPads dissipate significant ambient heat upward through the keyboard deck.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "thermal",
+    "resolvedAt": "2026-09-26T19:46:21.238Z"
+  },
+  {
+    "incidentId": "evt-37-2026-09-16T16:53:44-05:00",
+    "stepTitle": "Open display lid when docked: If using an external monitor/dock with the laptop lid closed, open the display—ThinkPads dissipate significant ambient heat upward through the keyboard deck.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "thermal",
+    "resolvedAt": "2026-09-26T19:46:24.983Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-19T14:20:12-05:00-106791",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "hardware",
+    "resolvedAt": "2026-09-26T19:46:37.482Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-19T14:20:10-05:00-106789",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "hardware",
+    "resolvedAt": "2026-09-26T19:46:43.421Z"
+  },
+  {
+    "incidentId": "evt-System-219-2026-09-19T14:20:09-05:00-106776",
+    "stepTitle": "Review technical details or check Windows Event Viewer if related to unexpected behavior.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "hardware",
+    "resolvedAt": "2026-09-26T19:46:49.011Z"
   }
 ]

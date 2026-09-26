@@ -1,18 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X, CheckCircle2, AlertCircle, AlertTriangle, Info,
   ChevronDown, ChevronUp, Copy, Check, Wrench, FileText,
   HelpCircle, Monitor, Power, HardDrive, Cpu, ShieldAlert,
-  ArrowRight, Sparkles, CheckSquare, CornerDownRight, RotateCcw
+  ArrowRight, Sparkles, CheckSquare, CornerDownRight, RotateCcw,
+  Layers
 } from 'lucide-react';
 
-export default function DiagnosisModal({ incident, onClose, onResolveIncident }) {
+export default function DiagnosisModal({ incident, allIncidents = [], onClose, onResolveIncident }) {
   const [completedSteps, setCompletedSteps] = useState({});
   const [stepResolutionState, setStepResolutionState] = useState({});
   const [isResolving, setIsResolving] = useState(false);
   const [resolvedSuccess, setResolvedSuccess] = useState(false);
   const [showTechnical, setShowTechnical] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Count how many identical events match this incident
+  const identicalCount = useMemo(() => {
+    if (!incident || !Array.isArray(allIncidents)) return 1;
+    const isTargetPnPOrEvent = incident.technicalDetails?.eventId && incident.technicalDetails?.provider;
+    return allIncidents.filter(other => {
+      if (other.id === incident.id) return true;
+      if (isTargetPnPOrEvent) {
+        return (
+          other.technicalDetails?.eventId === incident.technicalDetails.eventId &&
+          other.technicalDetails?.provider === incident.technicalDetails.provider &&
+          other.title === incident.title
+        );
+      }
+      return other.title === incident.title && other.category === incident.category;
+    }).length;
+  }, [incident, allIncidents]);
 
   if (!incident) return null;
 
@@ -39,7 +57,7 @@ export default function DiagnosisModal({ incident, onClose, onResolveIncident })
 
     if (onResolveIncident) {
       try {
-        await onResolveIncident(incident.id, stepText);
+        await onResolveIncident(incident.id, stepText, incident);
         setResolvedSuccess(true);
         setTimeout(() => {
           onClose();
@@ -198,6 +216,12 @@ ${incident.remediationSteps?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
                 {getCategoryIcon(incident.category)}
               </div>
               {getSeverityBadge(incident.severity)}
+              {identicalCount > 1 && (
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                  {identicalCount} Identical Events
+                </span>
+              )}
               <span className="text-xs font-mono text-slate-400">
                 {new Date(incident.timestamp).toLocaleString()}
               </span>
@@ -230,9 +254,15 @@ ${incident.remediationSteps?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
             <div className="bg-emerald-950/80 border border-emerald-500/80 rounded-xl p-4 flex items-center gap-3 text-emerald-200 animate-in fade-in slide-in-from-top-2 duration-300 shadow-xl shadow-emerald-950/40">
               <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
               <div>
-                <h4 className="font-bold text-sm text-white">Incident Permanently Resolved</h4>
+                <h4 className="font-bold text-sm text-white">
+                  {identicalCount > 1
+                    ? `Resolved & Cleared ${identicalCount} Identical Events`
+                    : 'Incident Permanently Resolved'}
+                </h4>
                 <p className="text-xs text-emerald-300/90 mt-0.5">
-                  This event has been cleared from active diagnostics. It will not reappear on rescans unless a new incident of this type occurs.
+                  {identicalCount > 1
+                    ? `This incident and all ${identicalCount} identical occurrences have been permanently cleared from active diagnostics and will not reappear on rescans.`
+                    : 'This event has been cleared from active diagnostics. It will not reappear on rescans unless a new incident occurs.'}
                 </p>
               </div>
             </div>
@@ -339,11 +369,18 @@ ${incident.remediationSteps?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
                                 <CheckCircle2 className="w-4 h-4" />
                               </div>
                               <div className="min-w-0">
-                                <div className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">
-                                  Yes, this resolved the issue
+                                <div className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors flex items-center gap-1.5 flex-wrap">
+                                  <span>Yes, this resolved the issue</span>
+                                  {identicalCount > 1 && (
+                                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
+                                      All {identicalCount} events
+                                    </span>
+                                  )}
                                 </div>
                                 <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">
-                                  Permanently clears this incident. Will not reappear on rescans.
+                                  {identicalCount > 1
+                                    ? `Permanently clears this incident and all ${identicalCount} identical events. Will not reappear on rescans.`
+                                    : 'Permanently clears this incident. Will not reappear on rescans.'}
                                 </p>
                               </div>
                             </button>
