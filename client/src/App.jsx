@@ -5,6 +5,7 @@ import IncidentCard from './components/IncidentCard';
 import DiagnosisModal from './components/DiagnosisModal';
 import HardwareStatusCard from './components/HardwareStatusCard';
 import DevicePairingModal from './components/DevicePairingModal';
+import MemoryDetailsModal from './components/MemoryDetailsModal';
 import {
   Search, CheckCircle2, AlertCircle, Power, Lock,
   Smartphone, RefreshCw, Calendar
@@ -15,6 +16,9 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedIncident, setSelectedIncident] = useState(null);
+
+  // Top Memory Processes Modal State
+  const [isMemoryModalOpen, setIsMemoryModalOpen] = useState(false);
 
   // Device Pairing & Modal State
   const [deviceInfo, setDeviceInfo] = useState(null);
@@ -130,6 +134,28 @@ export default function App() {
       }
 
       const json = await res.json();
+
+      // Filter out any locally resolved incidents
+      const localResolved = new Set(JSON.parse(localStorage.getItem('sentinel_resolved_incidents') || '[]'));
+      if (localResolved.size > 0 && Array.isArray(json.incidents)) {
+        json.incidents = json.incidents.filter(i => !localResolved.has(i.id));
+        const hasCritical = json.incidents.some(i => i.severity === 'critical');
+        const hasWarning = json.incidents.some(i => i.severity === 'warning');
+        if (!hasCritical) {
+          json.overallHealth = hasWarning ? {
+            status: 'warning',
+            label: 'Minor Warnings Detected',
+            color: 'amber',
+            summary: 'System is running, but warnings were detected.'
+          } : {
+            status: 'healthy',
+            label: 'All Systems Normal',
+            color: 'emerald',
+            summary: 'No critical crashes, unexpected power cuts, or hardware disconnects detected.'
+          };
+        }
+      }
+
       // Cache latest successful scan
       localStorage.setItem('sentinel_offline_cache', JSON.stringify(json));
       setPinRequired(false);
@@ -143,6 +169,10 @@ export default function App() {
       const cachedRaw = localStorage.getItem('sentinel_offline_cache');
       if (cachedRaw) {
         const cached = JSON.parse(cachedRaw);
+        const localResolved = new Set(JSON.parse(localStorage.getItem('sentinel_resolved_incidents') || '[]'));
+        if (localResolved.size > 0 && Array.isArray(cached.incidents)) {
+          cached.incidents = cached.incidents.filter(i => !localResolved.has(i.id));
+        }
         const hbTime = cached.scanTime;
         const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
         setIsOffline(true);
@@ -299,6 +329,77 @@ export default function App() {
     }
   };
 
+  // Permanently clear an incident upon user confirmation of resolution
+  const handleResolveIncident = async (incidentId, stepTitle) => {
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (userPin) {
+        headers['x-sentinel-pin'] = userPin;
+      }
+
+      // 1. Persist to server/resolvedIncidents.json via API
+      try {
+        await fetch('/api/incidents/resolve', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            incidentId,
+            stepTitle,
+            category: selectedIncident?.category || 'general'
+          })
+        });
+      } catch (apiErr) {
+        console.warn('Backend resolve API call failed, proceeding with client-side clearance:', apiErr);
+      }
+
+      // 2. Persist to localStorage
+      const localResolved = JSON.parse(localStorage.getItem('sentinel_resolved_incidents') || '[]');
+      if (!localResolved.includes(incidentId)) {
+        localResolved.push(incidentId);
+        localStorage.setItem('sentinel_resolved_incidents', JSON.stringify(localResolved));
+      }
+
+      // 3. Immediately clear from active data state & re-evaluate overall health
+      setData(prev => {
+        if (!prev) return prev;
+        const remainingIncidents = (prev.incidents || []).filter(i => i.id !== incidentId);
+        const hasCritical = remainingIncidents.some(i => i.severity === 'critical');
+        const hasWarning = remainingIncidents.some(i => i.severity === 'warning');
+
+        const updatedHealth = hasCritical ? {
+          status: 'critical',
+          label: 'Action Needed',
+          color: 'rose',
+          summary: 'Critical events detected (unexpected shutdown, BSOD, or hardware fault). Review diagnostic actions below.'
+        } : hasWarning ? {
+          status: 'warning',
+          label: 'Minor Warnings Detected',
+          color: 'amber',
+          summary: 'System is running, but warnings were detected (driver recoveries, throttling, or high wear).'
+        } : {
+          status: 'healthy',
+          label: 'All Systems Normal',
+          color: 'emerald',
+          summary: 'No critical crashes, unexpected power cuts, or hardware disconnects detected.'
+        };
+
+        const updatedData = {
+          ...prev,
+          incidents: remainingIncidents,
+          overallHealth: updatedHealth
+        };
+
+        localStorage.setItem('sentinel_offline_cache', JSON.stringify(updatedData));
+        return updatedData;
+      });
+
+      return true;
+    } catch (err) {
+      console.error('Failed to resolve incident:', err);
+      return false;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white pb-16">
       {/* 1. Header */}
@@ -408,6 +509,7 @@ export default function App() {
               systemSummary={data?.systemSummary}
               storageData={data?.storageData}
               onJumpToIncident={jumpToLatestIncident}
+              onOpenMemoryModal={() => setIsMemoryModalOpen(true)}
             />
 
             {/* 3. Main Dashboard Layout (2 Columns: Incident Timeline + Hardware Specs) */}
@@ -561,10 +663,18 @@ export default function App() {
         <DiagnosisModal
           incident={selectedIncident}
           onClose={() => setSelectedIncident(null)}
+          onResolveIncident={handleResolveIncident}
         />
       )}
 
-      {/* 5. Device Pairing & Companion App Modal */}
+      {/* 5. Memory RAM Analysis Modal */}
+      <MemoryDetailsModal
+        isOpen={isMemoryModalOpen}
+        onClose={() => setIsMemoryModalOpen(false)}
+        systemSummary={data?.systemSummary}
+      />
+
+      {/* 6. Device Pairing & Companion App Modal */}
       {isPairingModalOpen && (
         <DevicePairingModal
           onClose={() => setIsPairingModalOpen(false)}

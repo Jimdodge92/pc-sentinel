@@ -1,7 +1,7 @@
 import React from 'react';
 import { ShieldAlert, ShieldCheck, Power, HardDrive, Cpu, AlertTriangle } from 'lucide-react';
 
-export default function MetricsBar({ overallHealth, incidents = [], systemSummary, storageData, onJumpToIncident }) {
+export default function MetricsBar({ overallHealth, incidents = [], systemSummary, storageData, onJumpToIncident, onOpenMemoryModal }) {
   const criticalCount = incidents.filter(i => i.severity === 'critical').length;
   const warningCount = incidents.filter(i => i.severity === 'warning').length;
   const shutdownCrashes = incidents.filter(i => i.category === 'power' && i.severity === 'critical').length;
@@ -90,10 +90,18 @@ export default function MetricsBar({ overallHealth, incidents = [], systemSummar
       </div>
 
       {/* 4. Memory Utilization */}
-      <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between relative overflow-hidden backdrop-blur-sm">
+      <div
+        onClick={onOpenMemoryModal}
+        className={`bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between relative overflow-hidden backdrop-blur-sm transition-all ${
+          onOpenMemoryModal
+            ? 'cursor-pointer hover:bg-slate-900/90 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-950/20 active:scale-[0.99] group'
+            : ''
+        }`}
+        title="Click to view Top 5 Memory Consumption Programs"
+      >
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Memory (RAM)</span>
-          <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+          <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400 group-hover:scale-110 transition-transform">
             <Cpu className="w-5 h-5" />
           </div>
         </div>
@@ -113,6 +121,12 @@ export default function MetricsBar({ overallHealth, incidents = [], systemSummar
               }`}
               style={{ width: `${Math.min(systemSummary?.RAMUsagePercent || 0, 100)}%` }}
             />
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[11px]">
+            <span className="text-slate-500">Live Process Monitor</span>
+            <span className="text-blue-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+              Top 5 Apps &rarr;
+            </span>
           </div>
         </div>
       </div>

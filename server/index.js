@@ -44,6 +44,30 @@ function saveConfig(cfg) {
   }
 }
 
+// Persistent resolved incidents storage
+const RESOLVED_FILE = path.join(__dirname, 'resolvedIncidents.json');
+
+function loadResolvedIncidents() {
+  try {
+    if (fs.existsSync(RESOLVED_FILE)) {
+      return JSON.parse(fs.readFileSync(RESOLVED_FILE, 'utf8'));
+    }
+  } catch (e) {
+    console.error('Error loading resolved incidents:', e.message);
+  }
+  return [];
+}
+
+function saveResolvedIncidents(list) {
+  try {
+    fs.writeFileSync(RESOLVED_FILE, JSON.stringify(list, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    console.error('Error saving resolved incidents:', e.message);
+    return false;
+  }
+}
+
 /**
  * Get primary local LAN IPv4 address (e.g. 192.168.4.39)
  */
@@ -300,9 +324,43 @@ async function getDiagnosticSnapshot(days = 14) {
     systemSummary || {}
   );
 
+  // Filter out any resolved incidents
+  const resolvedList = loadResolvedIncidents();
+  const resolvedIds = new Set(resolvedList.map(r => r.incidentId));
+  const activeIncidents = (diagnosis.incidents || []).filter(inc => !resolvedIds.has(inc.id));
+
+  // Re-evaluate overall health for remaining active incidents
+  const hasCritical = activeIncidents.some(i => i.severity === 'critical');
+  const hasWarning = activeIncidents.some(i => i.severity === 'warning');
+
+  let overallHealth = {
+    status: 'healthy',
+    label: 'All Systems Normal',
+    color: 'emerald',
+    summary: 'No critical crashes, unexpected power cuts, or hardware disconnects detected.'
+  };
+
+  if (hasCritical) {
+    overallHealth = {
+      status: 'critical',
+      label: 'Action Needed',
+      color: 'rose',
+      summary: 'Critical events detected (unexpected shutdown, BSOD, or hardware fault). Review diagnostic actions below.'
+    };
+  } else if (hasWarning) {
+    overallHealth = {
+      status: 'warning',
+      label: 'Minor Warnings Detected',
+      color: 'amber',
+      summary: 'System is running, but warnings were detected (driver recoveries, throttling, or high wear).'
+    };
+  }
+
   return {
     scanTime: new Date().toISOString(),
-    ...diagnosis
+    ...diagnosis,
+    incidents: activeIncidents,
+    overallHealth
   };
 }
 
@@ -338,6 +396,99 @@ app.get('/api/diagnostics', requirePinIfRemote, async (req, res) => {
     console.error('[PC Sentinel] Diagnostics error:', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * Top Memory-Consuming Processes Endpoint
+ */
+app.get('/api/system/top-memory', requirePinIfRemote, async (req, res) => {
+  try {
+    const top = parseInt(req.query.top, 10) || 5;
+    const memData = await runPowerShellScript('get-top-memory-processes.ps1', ['-Top', top.toString()]);
+    res.json(memData || { topProcesses: [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Mark Incident as Resolved (clears permanently from active log and surviving rescans)
+ */
+app.post('/api/incidents/resolve', requirePinIfRemote, (req, res) => {
+  const { incidentId, stepTitle, resolutionNote, category } = req.body || {};
+  if (!incidentId) {
+    return res.status(400).json({ error: 'incidentId is required' });
+  }
+
+  const resolved = loadResolvedIncidents();
+  const existingIndex = resolved.findIndex(r => r.incidentId === incidentId);
+
+  const record = {
+    incidentId,
+    stepTitle: stepTitle || 'User confirmed fix step resolved issue',
+    resolutionNote: resolutionNote || 'Marked as resolved in PC Sentinel',
+    category: category || 'general',
+    resolvedAt: new Date().toISOString()
+  };
+
+  if (existingIndex >= 0) {
+    resolved[existingIndex] = record;
+  } else {
+    resolved.push(record);
+  }
+  saveResolvedIncidents(resolved);
+
+  // Invalidate cache and update cached diagnostics immediately
+  if (cachedDiagnostics && Array.isArray(cachedDiagnostics.incidents)) {
+    cachedDiagnostics.incidents = cachedDiagnostics.incidents.filter(i => i.id !== incidentId);
+    const hasCritical = cachedDiagnostics.incidents.some(i => i.severity === 'critical');
+    const hasWarning = cachedDiagnostics.incidents.some(i => i.severity === 'warning');
+
+    cachedDiagnostics.overallHealth = hasCritical ? {
+      status: 'critical',
+      label: 'Action Needed',
+      color: 'rose',
+      summary: 'Critical events detected (unexpected shutdown, BSOD, or hardware fault). Review diagnostic actions below.'
+    } : hasWarning ? {
+      status: 'warning',
+      label: 'Minor Warnings Detected',
+      color: 'amber',
+      summary: 'System is running, but warnings were detected (driver recoveries, throttling, or high wear).'
+    } : {
+      status: 'healthy',
+      label: 'All Systems Normal',
+      color: 'emerald',
+      summary: 'No critical crashes, unexpected power cuts, or hardware disconnects detected.'
+    };
+  }
+
+  res.json({
+    success: true,
+    message: 'Incident marked as resolved and permanently cleared from active logs.',
+    resolvedId: incidentId,
+    activeIncidentsCount: cachedDiagnostics ? cachedDiagnostics.incidents.length : undefined,
+    overallHealth: cachedDiagnostics ? cachedDiagnostics.overallHealth : undefined
+  });
+});
+
+/**
+ * List Resolved Incidents
+ */
+app.get('/api/incidents/resolved', requirePinIfRemote, (req, res) => {
+  const resolved = loadResolvedIncidents();
+  res.json(resolved);
+});
+
+/**
+ * Unresolve Incident (Restore to active diagnostics)
+ */
+app.post('/api/incidents/unresolve', requirePinIfRemote, (req, res) => {
+  const { incidentId } = req.body || {};
+  let resolved = loadResolvedIncidents();
+  resolved = resolved.filter(r => r.incidentId !== incidentId);
+  saveResolvedIncidents(resolved);
+  lastCacheTime = 0; // invalidate cache
+  res.json({ success: true, message: 'Incident restored to active log' });
 });
 
 /**
