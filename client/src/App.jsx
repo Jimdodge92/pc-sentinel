@@ -8,7 +8,7 @@ import DevicePairingModal from './components/DevicePairingModal';
 import MemoryDetailsModal from './components/MemoryDetailsModal';
 import {
   Search, CheckCircle2, AlertCircle, Power, Lock,
-  Smartphone, RefreshCw, Calendar
+  Smartphone, RefreshCw, Calendar, Trash2, Info
 } from 'lucide-react';
 
 export default function App() {
@@ -400,6 +400,56 @@ export default function App() {
     }
   };
 
+  // State & Handler to Clear All Informational Logs
+  const [showClearInfoModal, setShowClearInfoModal] = useState(false);
+  const [isClearingInfo, setIsClearingInfo] = useState(false);
+
+  const handleClearAllInfoLogs = async () => {
+    setIsClearingInfo(true);
+    try {
+      const infoIncidents = (data?.incidents || []).filter(i => i.severity === 'info');
+      const infoIds = infoIncidents.map(i => i.id);
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (userPin) {
+        headers['x-sentinel-pin'] = userPin;
+      }
+
+      // 1. Call backend API to record batch clearance
+      try {
+        await fetch('/api/incidents/clear-all-info', {
+          method: 'POST',
+          headers
+        });
+      } catch (apiErr) {
+        console.warn('Backend clear-all-info API call failed, continuing with client-side clearance:', apiErr);
+      }
+
+      // 2. Persist to localStorage resolved incidents set
+      const localResolved = JSON.parse(localStorage.getItem('sentinel_resolved_incidents') || '[]');
+      const updatedResolved = Array.from(new Set([...localResolved, ...infoIds]));
+      localStorage.setItem('sentinel_resolved_incidents', JSON.stringify(updatedResolved));
+
+      // 3. Immediately clear from active in-memory data state
+      setData(prev => {
+        if (!prev) return prev;
+        const remainingIncidents = (prev.incidents || []).filter(i => i.severity !== 'info');
+        const updatedData = {
+          ...prev,
+          incidents: remainingIncidents
+        };
+        localStorage.setItem('sentinel_offline_cache', JSON.stringify(updatedData));
+        return updatedData;
+      });
+
+      setShowClearInfoModal(false);
+    } catch (err) {
+      console.error('Failed to clear info logs:', err);
+    } finally {
+      setIsClearingInfo(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white pb-16">
       {/* 1. Header */}
@@ -577,6 +627,19 @@ export default function App() {
                         </button>
                       ))}
                     </div>
+
+                    {/* Clear All Info Logs Button */}
+                    {severityCounts.info > 0 && (
+                      <button
+                        onClick={() => setShowClearInfoModal(true)}
+                        disabled={isClearingInfo}
+                        className="px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:border-rose-500/60 shrink-0 shadow-sm active:scale-95"
+                        title="Clear all routine informational events"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Clear All Info Logs ({severityCounts.info})</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Category Filter Pills (Full Spectrum) */}
@@ -616,6 +679,31 @@ export default function App() {
 
                 {/* Incident Cards List */}
                 <div className="space-y-3">
+                  {/* Informational Logs Context Banner with Clear Action */}
+                  {severityFilter === 'info' && severityCounts.info > 0 && (
+                    <div className="bg-blue-950/40 border border-blue-800/60 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-md">
+                      <div className="flex items-center gap-2.5 text-blue-200">
+                        <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 shrink-0">
+                          <Info className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-white">Routine Operational Info Logs ({filteredIncidents.length})</div>
+                          <span className="text-[11px] text-blue-300/80">
+                            Modern Standby sleep/wake transitions, uptime markers, and Windows Update events.
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowClearInfoModal(true)}
+                        disabled={isClearingInfo}
+                        className="px-3.5 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-semibold transition-all flex items-center gap-1.5 shrink-0 shadow-sm active:scale-95"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Clear All ({severityCounts.info}) Info Logs</span>
+                      </button>
+                    </div>
+                  )}
+
                   {loading && !data ? (
                     <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-12 text-center text-slate-400 space-y-3">
                       <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto" />
@@ -680,6 +768,61 @@ export default function App() {
           onClose={() => setIsPairingModalOpen(false)}
           onRegenerate={(newInfo) => setDeviceInfo(newInfo)}
         />
+      )}
+
+      {/* 7. Clear All Info Logs Confirmation Modal */}
+      {showClearInfoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#0f172a] border border-slate-700/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Clear All Informational Logs?</h3>
+                <p className="text-xs text-slate-400">Permanently dismiss routine telemetry</p>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-300 leading-relaxed bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 space-y-2">
+              <p>
+                This will dismiss all <strong>{severityCounts.info}</strong> informational logs (Modern Standby power transitions, periodic uptime milestones, service state transitions).
+              </p>
+              <p className="text-[11px] text-slate-400">
+                🔒 <strong>Note:</strong> Critical crash events and hardware warnings will remain untouched. Cleared events will not reappear on rescans.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowClearInfoModal(false)}
+                disabled={isClearingInfo}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleClearAllInfoLogs}
+                disabled={isClearingInfo}
+                className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 transition-all shadow-lg shadow-rose-900/30 flex items-center gap-2 disabled:opacity-50"
+              >
+                {isClearingInfo ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Clearing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Yes, Clear All ({severityCounts.info})</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

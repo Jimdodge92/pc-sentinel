@@ -492,6 +492,96 @@ app.post('/api/incidents/unresolve', requirePinIfRemote, (req, res) => {
 });
 
 /**
+ * Clear All Informational Logs
+ */
+app.post('/api/incidents/clear-all-info', requirePinIfRemote, async (req, res) => {
+  if (!cachedDiagnostics) {
+    try {
+      cachedDiagnostics = await getDiagnosticSnapshot(14);
+      lastCacheTime = Date.now();
+    } catch (e) {
+      console.warn('Failed to load snapshot for clear-all-info:', e.message);
+    }
+  }
+
+  const currentIncidents = cachedDiagnostics?.incidents || [];
+  const infoIncidents = currentIncidents.filter(i => i.severity === 'info');
+  const infoIds = infoIncidents.map(i => i.id);
+
+  if (infoIds.length === 0) {
+    return res.json({ success: true, clearedCount: 0, message: 'No informational logs to clear' });
+  }
+
+  const resolved = loadResolvedIncidents();
+  const existingSet = new Set(resolved.map(r => r.incidentId));
+  const now = new Date().toISOString();
+
+  for (const id of infoIds) {
+    if (!existingSet.has(id)) {
+      resolved.push({
+        incidentId: id,
+        stepTitle: 'Cleared all info logs',
+        resolutionNote: 'Batch cleared info logs in PC Sentinel',
+        category: 'info',
+        resolvedAt: now
+      });
+      existingSet.add(id);
+    }
+  }
+  saveResolvedIncidents(resolved);
+
+  if (cachedDiagnostics && Array.isArray(cachedDiagnostics.incidents)) {
+    cachedDiagnostics.incidents = cachedDiagnostics.incidents.filter(i => !existingSet.has(i.id));
+  }
+
+  res.json({
+    success: true,
+    message: `Cleared ${infoIds.length} informational logs`,
+    clearedCount: infoIds.length,
+    clearedIds: infoIds,
+    remainingCount: cachedDiagnostics ? cachedDiagnostics.incidents.length : 0
+  });
+});
+
+/**
+ * Batch Resolve / Clear Incidents
+ */
+app.post('/api/incidents/resolve-batch', requirePinIfRemote, (req, res) => {
+  const { incidentIds, reason } = req.body || {};
+  if (!Array.isArray(incidentIds) || incidentIds.length === 0) {
+    return res.status(400).json({ error: 'incidentIds array is required' });
+  }
+
+  const resolved = loadResolvedIncidents();
+  const existingSet = new Set(resolved.map(r => r.incidentId));
+  const now = new Date().toISOString();
+
+  for (const id of incidentIds) {
+    if (!existingSet.has(id)) {
+      resolved.push({
+        incidentId: id,
+        stepTitle: reason || 'Cleared by user',
+        resolutionNote: 'Batch cleared in PC Sentinel',
+        category: 'general',
+        resolvedAt: now
+      });
+      existingSet.add(id);
+    }
+  }
+  saveResolvedIncidents(resolved);
+
+  if (cachedDiagnostics && Array.isArray(cachedDiagnostics.incidents)) {
+    cachedDiagnostics.incidents = cachedDiagnostics.incidents.filter(i => !existingSet.has(i.id));
+  }
+
+  res.json({
+    success: true,
+    clearedCount: incidentIds.length,
+    clearedIds: incidentIds
+  });
+});
+
+/**
  * Device Pairing & Identity info
  */
 app.get('/api/device/info', (req, res) => {

@@ -1,1 +1,30 @@
-[]
+[
+  {
+    "incidentId": "evt-thermal-shutdown-2026-09-17T20:44:05-05:00",
+    "stepTitle": "Elevate the rear of your LENOVO ThinkPad T15 Gen 1: Prop up the back rubber feet by 0.5–1 inch (using small rubber risers or an angled laptop stand). Raising the bottom intake vents off the desk surface immediately drops peak CPU temperatures by 8°C–15°C.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "thermal",
+    "resolvedAt": "2026-09-26T19:38:33.584Z"
+  },
+  {
+    "incidentId": "evt-37-2026-09-26T14:21:24-05:00",
+    "stepTitle": "Open display lid when docked: If using an external monitor/dock with the laptop lid closed, open the display—ThinkPads dissipate significant ambient heat upward through the keyboard deck.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "thermal",
+    "resolvedAt": "2026-09-26T19:38:53.319Z"
+  },
+  {
+    "incidentId": "evt-System-6013-2026-09-26T12:00:01-05:00-108508",
+    "stepTitle": "No action required. System is running stably.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "power",
+    "resolvedAt": "2026-09-26T19:39:21.139Z"
+  },
+  {
+    "incidentId": "evt-System-6013-2026-09-25T12:00:01-05:00-108420",
+    "stepTitle": "No action required. System is running stably.",
+    "resolutionNote": "Marked as resolved in PC Sentinel",
+    "category": "power",
+    "resolvedAt": "2026-09-26T19:39:26.489Z"
+  }
+]
