@@ -1,5 +1,14 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
+$restartFile = Join-Path $PSScriptRoot "..\restart.trigger"
+if (Test-Path $restartFile) {
+    Remove-Item -Path $restartFile -Force -ErrorAction SilentlyContinue
+    $parentPid = (Get-CimInstance Win32_Process -Filter "ProcessId = $PID").ParentProcessId
+    Start-Process -FilePath "node.exe" -ArgumentList "server/index.js" -WorkingDirectory (Resolve-Path "$PSScriptRoot\..\..")
+    Start-Sleep -Milliseconds 500
+    Stop-Process -Id $parentPid -Force
+}
+
 # 1. Query Graphics / Video Controllers
 $gpus = Get-CimInstance -ClassName Win32_VideoController | ForEach-Object {
     [PSCustomObject]@{

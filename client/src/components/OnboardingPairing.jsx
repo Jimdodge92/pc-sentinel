@@ -262,41 +262,44 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
         return;
       }
 
-      // 2. Parallel Race: Query Universal Cloud Relay and LAN probe simultaneously
+      // 2. Parallel Race: Query Universal Cloud Relay across redundant servers and LAN probe simultaneously
       const queryCloudRelay = async () => {
-        try {
-          const relayRes = await universalFetch(`https://ntfy.sh/pcsentinel-pair-${clean}/json?poll=1`, {
-            signal: AbortSignal.timeout(4500)
-          });
-          if (relayRes.ok) {
-            const text = await relayRes.text();
-            const lines = text.trim().split('\n').filter(Boolean);
-            for (let i = lines.length - 1; i >= 0; i--) {
-              try {
-                const lastMsg = JSON.parse(lines[i]);
-                if (lastMsg.message) {
-                  const record = JSON.parse(lastMsg.message);
-                  if (record.deviceId) {
-                    return {
-                      id: record.deviceId,
-                      name: record.deviceName || 'PC Sentinel Machine',
-                      hostUrl: record.lanUrl || record.wanUrl || '',
-                      lanUrl: record.lanUrl || '',
-                      wanUrl: record.wanUrl || null,
-                      lanIps: record.lanIps || [],
-                      relayTopic: record.relayTopic || `pcsentinel-telemetry-${record.deviceId}`,
-                      isCloudRelayed: true,
-                      status: record.status || 'healthy',
-                      isDefault: true,
-                      isOffline: false,
-                      lastSeen: record.lastSeen || new Date().toISOString()
-                    };
+        const relayServers = ['https://ntfy.adminforge.de', 'https://ntfy.tedomum.fr', 'https://ntfy.sh'];
+        for (const server of relayServers) {
+          try {
+            const relayRes = await universalFetch(`${server}/pcsentinel-pair-${clean}/json?poll=1`, {
+              signal: AbortSignal.timeout(3500)
+            });
+            if (relayRes.ok) {
+              const text = await relayRes.text();
+              const lines = text.trim().split('\n').filter(Boolean);
+              for (let i = lines.length - 1; i >= 0; i--) {
+                try {
+                  const lastMsg = JSON.parse(lines[i]);
+                  if (lastMsg.message) {
+                    const record = JSON.parse(lastMsg.message);
+                    if (record.deviceId) {
+                      return {
+                        id: record.deviceId,
+                        name: record.deviceName || 'PC Sentinel Machine',
+                        hostUrl: record.lanUrl || record.wanUrl || '',
+                        lanUrl: record.lanUrl || '',
+                        wanUrl: record.wanUrl || null,
+                        lanIps: record.lanIps || [],
+                        relayTopic: record.relayTopic || `pcsentinel-telemetry-${record.deviceId}`,
+                        isCloudRelayed: true,
+                        status: record.status || 'healthy',
+                        isDefault: true,
+                        isOffline: false,
+                        lastSeen: record.lastSeen || new Date().toISOString()
+                      };
+                    }
                   }
-                }
-              } catch (lineErr) {}
+                } catch (lineErr) {}
+              }
             }
-          }
-        } catch (cloudErr) {}
+          } catch (cloudErr) {}
+        }
         return null;
       };
 

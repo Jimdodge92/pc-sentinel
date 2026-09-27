@@ -40,6 +40,13 @@ export const getApiBase = () => {
   return '';
 };
 
+// Global cross-network zero-config relay endpoints (multi-datacenter redundancy)
+export const RELAY_SERVERS = [
+  'https://ntfy.adminforge.de',
+  'https://ntfy.tedomum.fr',
+  'https://ntfy.sh'
+];
+
 // Universal Fetch: uses standard asynchronous fetch with native Android HTTP bridge fallback for CORS/PNA
 export async function universalFetch(url, options = {}) {
   let targetUrl = url;
@@ -362,58 +369,74 @@ export default function App() {
         }
 
         if (!res) {
-          // 1. Try Universal Zero-Config Cloud Relay (Global Cross-Network Link)
+          // 1. Try Universal Zero-Config Cloud Relay across redundant servers
           const relayTopic = activeDevice?.relayTopic || (activeDevice?.id && activeDevice.id !== 'local-host' ? `pcsentinel-telemetry-${activeDevice.id}` : null);
           if (relayTopic) {
-            try {
-              const ntfyRes = await universalFetch(`https://ntfy.sh/${relayTopic}/json?poll=1`, {
-                signal: AbortSignal.timeout(6000)
-              });
-              if (ntfyRes.ok) {
-                const text = await ntfyRes.text();
-                const lines = text.trim().split('\n').filter(Boolean);
-                for (let i = lines.length - 1; i >= 0; i--) {
-                  try {
-                    const lastMsg = JSON.parse(lines[i]);
-                    let telemetry = null;
-                    if (lastMsg.attachment?.url) {
-                      const attachRes = await universalFetch(lastMsg.attachment.url, {
-                        signal: AbortSignal.timeout(8000)
-                      });
-                      if (attachRes.ok) {
-                        telemetry = await attachRes.json();
-                      }
-                    } else if (lastMsg.message) {
-                      try {
-                        telemetry = JSON.parse(lastMsg.message);
-                      } catch (e) {}
-                    }
-
-                    if (telemetry) {
-                      localStorage.setItem(`sentinel_cache_${activeDevice.id}`, JSON.stringify(telemetry));
-                      localStorage.setItem('sentinel_offline_cache', JSON.stringify(telemetry));
-                      const hbTime = telemetry.scanTime;
-                      const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
-                      if (ageMins > 5) {
-                        setIsOffline(true);
-                        setOfflineInfo({
-                          lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Prior to shutdown',
-                          ageMins
+            for (const server of RELAY_SERVERS) {
+              try {
+                const ntfyRes = await universalFetch(`${server}/${relayTopic}/json?poll=1`, {
+                  signal: AbortSignal.timeout(4500)
+                });
+                if (ntfyRes.ok) {
+                  const text = await ntfyRes.text();
+                  const lines = text.trim().split('\n').filter(Boolean);
+                  for (let i = lines.length - 1; i >= 0; i--) {
+                    try {
+                      const lastMsg = JSON.parse(lines[i]);
+                      let telemetry = null;
+                      if (lastMsg.attachment?.url) {
+                        const attachRes = await universalFetch(lastMsg.attachment.url, {
+                          signal: AbortSignal.timeout(6000)
                         });
-                      } else {
-                        setIsOffline(false);
-                        setOfflineInfo(null);
+                        if (attachRes.ok) {
+                          telemetry = await attachRes.json();
+                        }
+                      } else if (lastMsg.message) {
+                        try {
+                          telemetry = JSON.parse(lastMsg.message);
+                        } catch (e) {}
                       }
-                      setData(telemetry);
-                      setPinRequired(false);
-                      setLoading(false);
-                      return;
-                    }
-                  } catch (lineErr) {}
+
+                      if (telemetry && (telemetry.deviceId || telemetry.overallHealth)) {
+                        localStorage.setItem(`sentinel_cache_${activeDevice.id}`, JSON.stringify(telemetry));
+                        localStorage.setItem('sentinel_offline_cache', JSON.stringify(telemetry));
+                        const hbTime = telemetry.heartbeatTime || telemetry.scanTime;
+                        const ageMins = hbTime ? Math.max(0, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
+                        if (ageMins > 4) {
+                          setIsOffline(true);
+                          setOfflineInfo({
+                            lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Prior to shutdown',
+                            ageMins
+                          });
+                        } else {
+                          setIsOffline(false);
+                          setOfflineInfo(null);
+                          setShutdownIntent(null);
+                          localStorage.removeItem('sentinel_shutdown_intent');
+                        }
+
+                        // If it's a lightweight heartbeat without full incident details, merge with existing state
+                        let finalTelemetry = telemetry;
+                        if (!finalTelemetry.incidents && data?.incidents) {
+                          finalTelemetry = {
+                            ...data,
+                            ...finalTelemetry,
+                            incidents: data.incidents,
+                            overallHealth: finalTelemetry.overallHealth || data.overallHealth
+                          };
+                        }
+
+                        setData(finalTelemetry);
+                        setPinRequired(false);
+                        setLoading(false);
+                        return;
+                      }
+                    } catch (lineErr) {}
+                  }
                 }
+              } catch (relayErr) {
+                // Try next relay server
               }
-            } catch (relayErr) {
-              console.warn('Universal Cloud Relay fetch notice:', relayErr);
             }
           }
 
@@ -566,18 +589,35 @@ export default function App() {
     if (isAndroidNative() && !activeDevice) return;
 
     let eventSource = null;
-    let pollTimer = null;
+    let reconnectTimeout = null;
     let isConnecting = false;
 
     const connectSSE = () => {
       if (isConnecting) return;
       isConnecting = true;
 
+      const base = activeDevice?.hostUrl || getApiBase();
+      const relayTopic = activeDevice?.relayTopic || (activeDevice?.id && activeDevice.id !== 'local-host' ? `pcsentinel-telemetry-${activeDevice.id}` : null);
       const pinParam = userPin ? `?pin=${encodeURIComponent(userPin)}` : '';
-      const sseUrl = `${getApiBase()}/api/stream${pinParam}`;
+      
+      // Determine stream endpoint: direct local SSE first, or Cloud Relay SSE over cellular
+      let sseUrl = (base && !base.includes('appassets.androidplatform.net')) 
+        ? `${base}/api/stream${pinParam}` 
+        : (relayTopic ? `https://ntfy.adminforge.de/${relayTopic}/sse` : null);
+
+      if (!sseUrl) {
+        isConnecting = false;
+        return;
+      }
 
       try {
         eventSource = new EventSource(sseUrl);
+
+        eventSource.addEventListener('open', () => {
+          isConnecting = false;
+          setIsOffline(false);
+          setReconnectAttempt(0);
+        });
 
         eventSource.addEventListener('connected', () => {
           isConnecting = false;
@@ -590,12 +630,29 @@ export default function App() {
           setReconnectAttempt(0);
         });
 
+        // Universal Cloud Relay SSE payload receiver
+        eventSource.addEventListener('message', (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'shutdown_intent' || data.event === 'shutdown_intent') {
+              const intent = data.intent || data;
+              setShutdownIntent(intent);
+              localStorage.setItem('sentinel_shutdown_intent', JSON.stringify(intent));
+              setIsOffline(true);
+            } else if (data.attachment?.url || data.event === 'message') {
+              // Fresh diagnostic telemetry published to cloud
+              fetchDiagnostics(false);
+            }
+          } catch (err) {}
+        });
+
         eventSource.addEventListener('shutdown_intent', (e) => {
           try {
             const intent = JSON.parse(e.data);
             console.warn('[Sentinel SSE] 🚨 Intercepted impending shutdown:', intent);
             setShutdownIntent(intent);
             localStorage.setItem('sentinel_shutdown_intent', JSON.stringify(intent));
+            setIsOffline(true);
 
             // Trigger native Android notification if running in mobile companion APK
             if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.showNotification) {
@@ -610,35 +667,27 @@ export default function App() {
 
         eventSource.onerror = () => {
           isConnecting = false;
-          setIsOffline(true);
           if (eventSource) {
             eventSource.close();
             eventSource = null;
           }
 
-          // Start polling /api/health to automatically reconnect when host completes reboot
-          if (!pollTimer) {
-            pollTimer = setInterval(async () => {
-              setReconnectAttempt(prev => prev + 1);
-              try {
-                const testRes = await universalFetch(`${getApiBase()}/api/health`, { signal: AbortSignal.timeout(2000) });
-                if (testRes.ok) {
-                  clearInterval(pollTimer);
-                  pollTimer = null;
-                  setShutdownIntent(null);
-                  localStorage.removeItem('sentinel_shutdown_intent');
-                  setIsOffline(false);
-                  setReconnectAttempt(0);
-                  setReconnectedToast(`${activeDevice?.name || 'PC'} back online! Live telemetry refreshed.`);
-                  setTimeout(() => setReconnectedToast(null), 6000);
-                  fetchDiagnostics(true);
-                  connectSSE();
-                }
-              } catch (e) {
-                // Host still booting/offline
-              }
-            }, 2500);
+          // A mobile network drop or Wi-Fi to cellular transition is normal;
+          // NEVER mark the host as crashed on a client-side socket error!
+          if (relayTopic && !sseUrl.includes('ntfy.adminforge.de')) {
+            // Local LAN stream unreachable; seamlessly switch to Cloud Relay SSE
+            sseUrl = `https://ntfy.adminforge.de/${relayTopic}/sse`;
+            reconnectTimeout = setTimeout(connectSSE, 2000);
+            return;
+          } else if (relayTopic && sseUrl.includes('ntfy.adminforge.de')) {
+            // Switch to secondary relay
+            sseUrl = `https://ntfy.tedomum.fr/${relayTopic}/sse`;
+            reconnectTimeout = setTimeout(connectSSE, 2000);
+            return;
           }
+
+          // Reconnect gracefully
+          reconnectTimeout = setTimeout(connectSSE, 8000);
         };
       } catch (err) {
         isConnecting = false;
@@ -649,9 +698,38 @@ export default function App() {
 
     return () => {
       if (eventSource) eventSource.close();
-      if (pollTimer) clearInterval(pollTimer);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
-  }, [pinRequired, userPin]);
+  }, [pinRequired, userPin, activeDeviceId]);
+
+  // Background Telemetry Poller: keeps dashboard live across 5G/cellular/LAN every 15 seconds
+  useEffect(() => {
+    if (pinRequired) return;
+    if (isAndroidNative() && !activeDevice) return;
+
+    const interval = setInterval(() => {
+      fetchDiagnostics(false);
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [pinRequired, activeDeviceId, daysFilter]);
+
+  // Rapid recovery poller when host is actively offline or rebooting
+  useEffect(() => {
+    if (!isOffline) {
+      setReconnectAttempt(0);
+      return;
+    }
+
+    const timer = setInterval(async () => {
+      setReconnectAttempt(prev => prev + 1);
+      try {
+        await fetchDiagnostics(true);
+      } catch (e) {}
+    }, 3000);
+
+    return () => clearInterval(timer);
+  }, [isOffline, activeDeviceId]);
 
   const handlePinSubmit = async (e) => {
     e.preventDefault();

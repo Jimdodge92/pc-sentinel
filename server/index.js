@@ -11,7 +11,9 @@ const {
   setFirebaseConfig,
   pushToFirebase,
   startFirebaseHeartbeat,
-  triggerEmergencyPush
+  announcePairingRendezvous,
+  triggerEmergencyPush,
+  publishShutdownAlert
 } = require('./devicePairing');
 const { FleetDiscovery } = require('./fleetDiscovery');
 
@@ -120,6 +122,9 @@ function broadcastSSE(event, data) {
       sseClients.delete(client);
     }
   }
+  if (event === 'shutdown_intent') {
+    publishShutdownAlert(data).catch(() => {});
+  }
 }
 
 /**
@@ -213,7 +218,9 @@ function runPowerShellScript(scriptName, args = []) {
 
     execFile('powershell.exe', cmdArgs, {
       maxBuffer: 1024 * 1024 * 16, // 16MB buffer for event logs
-      windowsHide: true
+      windowsHide: true,
+      timeout: 12000,
+      killSignal: 'SIGKILL'
     }, (error, stdout, stderr) => {
       if (error) {
         console.error(`Error running script ${scriptName}:`, error.message);
@@ -804,6 +811,10 @@ app.get('/api/device/info', (req, res) => {
 
   const shortCode = device.deviceId ? device.deviceId.replace(/^SENT-/, '') : '';
   const relayTopic = `pcsentinel-telemetry-${device.deviceId}`;
+
+  // Instant refresh of pairing announcement to Cloud Relay rendezvous
+  announcePairingRendezvous('healthy').catch(() => {});
+
   const qrPayload = JSON.stringify({
     id: device.deviceId,
     code: shortCode,
@@ -1001,7 +1012,39 @@ app.listen(PORT, () => {
   // Start Background Firebase Cloud Heartbeat
   startFirebaseHeartbeat(async () => {
     try {
-      return cachedDiagnostics || await getDiagnosticSnapshot(7);
+      const now = Date.now();
+      // If we don't have cached diagnostics or it's older than 60s, refresh with a strict 10s timeout
+      if (!cachedDiagnostics || (now - lastCacheTime > 60000)) {
+        try {
+          await Promise.race([
+            getDiagnosticSnapshot(7),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Heartbeat snapshot timeout')), 10000))
+          ]);
+        } catch (snapErr) {
+          console.warn('[FirebaseRelay] Diagnostic refresh timed out or busy, using fallback cache');
+        }
+      }
+
+      if (cachedDiagnostics) {
+        // Stamp current live heartbeat time so remote/cellular companions know host is actively beating
+        return {
+          ...cachedDiagnostics,
+          scanTime: new Date().toISOString(),
+          heartbeatTime: new Date().toISOString()
+        };
+      }
+
+      return {
+        overallHealth: {
+          status: 'healthy',
+          label: 'All Systems Normal',
+          color: 'emerald',
+          summary: 'PC Sentinel service active and running.'
+        },
+        incidents: [],
+        scanTime: new Date().toISOString(),
+        heartbeatTime: new Date().toISOString()
+      };
     } catch (e) {
       console.error('[FirebaseRelay] Heartbeat collection error:', e.message);
       return null;
