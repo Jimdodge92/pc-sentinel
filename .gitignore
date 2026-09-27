@@ -27,3 +27,7 @@ Thumbs.db
 *.log
 scratch/
 dist-installer/
+*.apk
+*.exe
+!server/public/*.exe
+!server/public/*.apk

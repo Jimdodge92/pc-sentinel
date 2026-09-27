@@ -430,60 +430,79 @@ app.get('/api/storage-health', requirePinIfRemote, async (req, res) => {
 /**
  * Core Diagnostic Collector
  * Collects events, hardware, and storage, runs the diagnostic engine, and returns complete analysis.
+ * Coalesces concurrent calls so multiple requests share a single in-flight scan.
  */
+let activeScanPromise = null;
+
 async function getDiagnosticSnapshot(days = 14) {
-  const [events, deviceStatus, storageData, systemSummary] = await Promise.all([
-    runPowerShellScript('get-system-events.ps1', ['-Days', days.toString(), '-MaxEvents', '300']),
-    runPowerShellScript('get-device-status.ps1'),
-    runPowerShellScript('get-storage-reliability.ps1'),
-    runPowerShellScript('get-system-summary.ps1')
-  ]);
-
-  const diagnosis = analyzeDiagnostics(
-    events || [],
-    deviceStatus || {},
-    storageData || {},
-    systemSummary || {}
-  );
-
-  // Filter out any resolved incidents
-  const resolvedList = loadResolvedIncidents();
-  const resolvedIds = new Set(resolvedList.map(r => r.incidentId));
-  const activeIncidents = (diagnosis.incidents || []).filter(inc => !resolvedIds.has(inc.id));
-
-  // Re-evaluate overall health for remaining active incidents
-  const hasCritical = activeIncidents.some(i => i.severity === 'critical');
-  const hasWarning = activeIncidents.some(i => i.severity === 'warning');
-
-  let overallHealth = {
-    status: 'healthy',
-    label: 'All Systems Normal',
-    color: 'emerald',
-    summary: 'No critical crashes, unexpected power cuts, or hardware disconnects detected.'
-  };
-
-  if (hasCritical) {
-    overallHealth = {
-      status: 'critical',
-      label: 'Action Needed',
-      color: 'rose',
-      summary: 'Critical events detected (unexpected shutdown, BSOD, or hardware fault). Review diagnostic actions below.'
-    };
-  } else if (hasWarning) {
-    overallHealth = {
-      status: 'warning',
-      label: 'Minor Warnings Detected',
-      color: 'amber',
-      summary: 'System is running, but warnings were detected (driver recoveries, throttling, or high wear).'
-    };
+  if (activeScanPromise) {
+    return activeScanPromise;
   }
 
-  return {
-    scanTime: new Date().toISOString(),
-    ...diagnosis,
-    incidents: activeIncidents,
-    overallHealth
-  };
+  activeScanPromise = (async () => {
+    try {
+      const [events, deviceStatus, storageData, systemSummary] = await Promise.all([
+        runPowerShellScript('get-system-events.ps1', ['-Days', days.toString(), '-MaxEvents', '300']),
+        runPowerShellScript('get-device-status.ps1'),
+        runPowerShellScript('get-storage-reliability.ps1'),
+        runPowerShellScript('get-system-summary.ps1')
+      ]);
+
+      const diagnosis = analyzeDiagnostics(
+        events || [],
+        deviceStatus || {},
+        storageData || {},
+        systemSummary || {}
+      );
+
+      // Filter out any resolved incidents
+      const resolvedList = loadResolvedIncidents();
+      const resolvedIds = new Set(resolvedList.map(r => r.incidentId));
+      const activeIncidents = (diagnosis.incidents || []).filter(inc => !resolvedIds.has(inc.id));
+
+      // Re-evaluate overall health for remaining active incidents
+      const hasCritical = activeIncidents.some(i => i.severity === 'critical');
+      const hasWarning = activeIncidents.some(i => i.severity === 'warning');
+
+      let overallHealth = {
+        status: 'healthy',
+        label: 'All Systems Normal',
+        color: 'emerald',
+        summary: 'No critical crashes, unexpected power cuts, or hardware disconnects detected.'
+      };
+
+      if (hasCritical) {
+        overallHealth = {
+          status: 'critical',
+          label: 'Action Needed',
+          color: 'rose',
+          summary: 'Critical events detected (unexpected shutdown, BSOD, or hardware fault). Review diagnostic actions below.'
+        };
+      } else if (hasWarning) {
+        overallHealth = {
+          status: 'warning',
+          label: 'Minor Warnings Detected',
+          color: 'amber',
+          summary: 'System is running, but warnings were detected (driver recoveries, throttling, or high wear).'
+        };
+      }
+
+      const snapshot = {
+        scanTime: new Date().toISOString(),
+        ...diagnosis,
+        incidents: activeIncidents,
+        overallHealth
+      };
+
+      cachedDiagnostics = snapshot;
+      lastCacheTime = Date.now();
+      return snapshot;
+    } finally {
+      activeScanPromise = null;
+    }
+  })();
+
+  return activeScanPromise;
 }
 
 /**
@@ -500,20 +519,19 @@ app.get('/api/diagnostics', requirePinIfRemote, async (req, res) => {
 
   try {
     console.log(`[PC Sentinel] Running diagnostic scan (Days: ${days})...`);
-    cachedDiagnostics = await getDiagnosticSnapshot(days);
-    lastCacheTime = now;
+    const diagnostics = await getDiagnosticSnapshot(days);
 
-    console.log(`[PC Sentinel] Scan complete. Found ${cachedDiagnostics.incidents.length} incident(s). Status: ${cachedDiagnostics.overallHealth.status}`);
+    console.log(`[PC Sentinel] Scan complete. Found ${diagnostics.incidents.length} incident(s). Status: ${diagnostics.overallHealth.status}`);
 
     // If a critical thermal or emergency shutdown incident is active, trigger immediate emergency push
-    const hasEmergency = (cachedDiagnostics.incidents || []).some(
+    const hasEmergency = (diagnostics.incidents || []).some(
       inc => inc.category === 'thermal' && inc.severity === 'critical'
     );
     if (hasEmergency) {
-      triggerEmergencyPush(cachedDiagnostics).catch(e => console.error('[FirebaseRelay] Emergency push error:', e.message));
+      triggerEmergencyPush(diagnostics).catch(e => console.error('[FirebaseRelay] Emergency push error:', e.message));
     }
 
-    res.json(cachedDiagnostics);
+    res.json(diagnostics);
   } catch (err) {
     console.error('[PC Sentinel] Diagnostics error:', err);
     res.status(500).json({ error: err.message });
@@ -918,6 +936,14 @@ app.listen(PORT, () => {
   } catch (e) {
     console.warn('[FleetDiscovery] Init warning:', e.message);
   }
+
+  // Proactively warm up diagnostics cache on server startup
+  console.log('[PC Sentinel] Pre-warming diagnostic cache on boot...');
+  getDiagnosticSnapshot(14).then(snapshot => {
+    console.log(`[PC Sentinel] Initial boot scan completed successfully (${snapshot.incidents?.length || 0} incidents analyzed).`);
+  }).catch(err => {
+    console.warn('[PC Sentinel] Boot pre-warm warning:', err.message);
+  });
 
   // Start Heartbeat interval for active SSE clients (every 5 seconds)
   setInterval(() => {

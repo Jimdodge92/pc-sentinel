@@ -6,39 +6,6 @@ param(
 $ErrorActionPreference = 'SilentlyContinue'
 $startDate = (Get-Date).AddDays(-$Days)
 
-# 1. Target Event IDs across key critical providers
-$targetEvents = @(
-    # CRITICAL Emergency Shutdowns & Kernel Hardware Cuts (Never crowded out by sleep)
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Power'; Id = @(41, 86, 88) },
-    @{ LogName = 'System'; ProviderName = 'EventLog'; Id = @(6008) },
-    @{ LogName = 'System'; ProviderName = 'User32'; Id = @(1074) },
-    @{ LogName = 'System'; ProviderName = 'BugCheck'; Id = @(1001) },
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Processor-Power'; Id = @(37) },
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WHEA-Logger'; Id = @(17, 18, 19, 47) },
-    @{ LogName = 'System'; ProviderName = 'disk'; Id = @(7, 11, 153) },
-    @{ LogName = 'System'; ProviderName = 'storahci'; Id = @(129, 153) },
-    @{ LogName = 'System'; ProviderName = 'nvme'; Id = @(11, 153) },
-    @{ LogName = 'System'; ProviderName = 'Display'; Id = @(4101) },
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Resource-Exhaustion-Detector'; Id = @(2004) },
-    @{ LogName = 'Application'; ProviderName = 'Application Error'; Id = @(1000) },
-    @{ LogName = 'Application'; ProviderName = 'Application Hang'; Id = @(1002) },
-    # Routine Power, Sleep & Boot Events
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Power'; Id = @(42, 107, 109, 506, 507) },
-    @{ LogName = 'System'; ProviderName = 'EventLog'; Id = @(6005, 6006, 6013) },
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Acpi'; Id = @(12, 13) },
-    # Driver & Device PnP
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-PnP'; Id = @(219, 400, 410, 420) },
-    # Windows Update
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WindowsUpdateClient'; Id = @(19, 20, 43) },
-    # Service Control Manager
-    @{ LogName = 'System'; ProviderName = 'Service Control Manager'; Id = @(7000, 7009, 7036, 7040) },
-    # Network Link
-    @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WLAN-AutoConfig'; Id = @(8001, 8002, 8003, 10002) },
-    # Application & Setup
-    @{ LogName = 'Application'; ProviderName = 'Windows Error Reporting'; Id = @(1001) },
-    @{ LogName = 'Application'; ProviderName = 'MsiInstaller'; Id = @(1033, 11707, 11708) }
-)
-
 $results = [System.Collections.Generic.List[PSCustomObject]]::new()
 $seenRecords = [System.Collections.Generic.HashSet[string]]::new()
 
@@ -75,53 +42,54 @@ function Add-EventRecord($evt) {
     $results.Add($record)
 }
 
-# 1. Fetch targeted high-priority events
-foreach ($target in $targetEvents) {
-    try {
-        $filter = @{
-            LogName = $target.LogName
-            ProviderName = $target.ProviderName
-            Id = $target.Id
-            StartTime = $startDate
-        }
-        $events = Get-WinEvent -FilterHashtable $filter -MaxEvents 30 -ErrorAction SilentlyContinue
-        if ($events) {
-            foreach ($evt in $events) {
-                Add-EventRecord $evt
-            }
-        }
-    } catch {}
-}
-
-# 2. Fetch general System and Application logs across all levels
+# 1. Fast Batched Queries (Replaces slow 22-step iterative loop)
+# Query A: All Critical (1), Error (2), and Warning (3) from System Log
 try {
-    $genEvents = Get-WinEvent -FilterHashtable @{
-        LogName = @('System', 'Application')
+    $sysIssues = Get-WinEvent -FilterHashtable @{
+        LogName = 'System'
+        Level = @(1, 2, 3)
         StartTime = $startDate
     } -MaxEvents 150 -ErrorAction SilentlyContinue
+    if ($sysIssues) {
+        foreach ($evt in $sysIssues) { Add-EventRecord $evt }
+    }
+} catch {}
 
-    if ($genEvents) {
-        $noisyCounts = @{}
-        foreach ($evt in $genEvents) {
-            # Skip high-frequency UPnP HTTP service noise
-            if ($evt.ProviderName -eq 'Microsoft-Windows-HttpService') { continue }
+# Query B: All Critical (1), Error (2), and Warning (3) from Application Log
+try {
+    $appIssues = Get-WinEvent -FilterHashtable @{
+        LogName = 'Application'
+        Level = @(1, 2, 3)
+        StartTime = $startDate
+    } -MaxEvents 100 -ErrorAction SilentlyContinue
+    if ($appIssues) {
+        foreach ($evt in $appIssues) { Add-EventRecord $evt }
+    }
+} catch {}
 
-            $providerKey = "$($evt.ProviderName):$($evt.Id)"
-            if (-not $noisyCounts.ContainsKey($providerKey)) {
-                $noisyCounts[$providerKey] = 0
-            }
-            $noisyCounts[$providerKey]++
+# Query C: Targeted System Informational events (Power, Reboots, Clean Shutdowns, Sleep/Wake, PnP)
+$targetedSysIds = @(41, 86, 88, 1074, 6005, 6006, 6008, 6013, 1001, 37, 42, 107, 109, 506, 507, 12, 13, 219, 400, 410, 420)
+try {
+    $sysTargeted = Get-WinEvent -FilterHashtable @{
+        LogName = 'System'
+        Id = $targetedSysIds
+        StartTime = $startDate
+    } -MaxEvents 120 -ErrorAction SilentlyContinue
+    if ($sysTargeted) {
+        foreach ($evt in $sysTargeted) { Add-EventRecord $evt }
+    }
+} catch {}
 
-            # Limit high-volume background tasks
-            $maxAllowed = 3
-            if ($evt.ProviderName -like '*Security-SPP*') { $maxAllowed = 1 }
-
-            if ($evt.Level -eq 4 -and $noisyCounts[$providerKey] -gt $maxAllowed) {
-                continue
-            }
-
-            Add-EventRecord $evt
-        }
+# Query D: Targeted Application Informational events (Crash Reporting, Installers)
+$targetedAppIds = @(1000, 1001, 1002, 1033, 11707, 11708)
+try {
+    $appTargeted = Get-WinEvent -FilterHashtable @{
+        LogName = 'Application'
+        Id = $targetedAppIds
+        StartTime = $startDate
+    } -MaxEvents 60 -ErrorAction SilentlyContinue
+    if ($appTargeted) {
+        foreach ($evt in $appTargeted) { Add-EventRecord $evt }
     }
 } catch {}
 

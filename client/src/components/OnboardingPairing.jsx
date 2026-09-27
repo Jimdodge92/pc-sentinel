@@ -18,85 +18,69 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
   const [cameraError, setCameraError] = useState(null);
   const qrScannerRef = useRef(null);
 
-  // Nearby Discovery State
+  // Nearby Discovery State (on-demand only, never blocks UI on launch)
   const [discoveredPCs, setDiscoveredPCs] = useState([]);
-  const [isScanningNetwork, setIsScanningNetwork] = useState(true);
+  const [isScanningNetwork, setIsScanningNetwork] = useState(false);
 
-  // 1. Live Wi-Fi scan on mount to find nearby PCs automatically
-  useEffect(() => {
-    let isMounted = true;
-
-    const probeNetwork = async () => {
-      setIsScanningNetwork(true);
-      try {
-        let phoneIp = '';
-        if (typeof window !== 'undefined' && window.AndroidBridge?.getDeviceWifiIp) {
-          phoneIp = window.AndroidBridge.getDeviceWifiIp();
-        }
-
-        // Determine base subnet prefixes to probe
-        const subnets = [];
-        if (phoneIp && phoneIp.includes('.')) {
-          const parts = phoneIp.split('.');
-          subnets.push(`${parts[0]}.${parts[1]}.${parts[2]}`);
-        }
-        // Common home subnets fallback
-        if (!subnets.includes('192.168.4')) subnets.push('192.168.4');
-        if (!subnets.includes('192.168.1')) subnets.push('192.168.1');
-        if (!subnets.includes('192.168.0')) subnets.push('192.168.0');
-
-        // Probe high-probability IPs in parallel
-        const found = [];
-        for (const subnet of subnets.slice(0, 2)) {
-          // Probe common DHCP IPs
-          const candidateIps = [
-            `${subnet}.1`, `${subnet}.39`, `${subnet}.50`, `${subnet}.100`,
-            `${subnet}.101`, `${subnet}.105`, `${subnet}.110`, `${subnet}.120`,
-            `${subnet}.150`, `${subnet}.200`
-          ];
-
-          await Promise.allSettled(
-            candidateIps.map(async (ip) => {
-              try {
-                const res = await universalFetch(`http://${ip}:3500/api/device/info`, {
-                  signal: AbortSignal.timeout(1800)
-                });
-                if (res.ok) {
-                  const info = await res.json();
-                  if (info.deviceId && !found.some(p => p.deviceId === info.deviceId)) {
-                    found.push({
-                      deviceId: info.deviceId,
-                      deviceName: info.deviceName || 'PC Sentinel Host',
-                      url: `http://${ip}:3500`,
-                      ip: ip,
-                      shortCode: info.shortCode || info.deviceId.replace(/^SENT-/, '')
-                    });
-                  }
-                }
-              } catch (e) {}
-            })
-          );
-        }
-
-        if (isMounted) {
-          setDiscoveredPCs(found);
-        }
-      } catch (err) {
-        console.warn('Network probe error:', err);
-      } finally {
-        if (isMounted) setIsScanningNetwork(false);
+  // On-demand network probe for nearby PCs on Wi-Fi (parallel, non-blocking)
+  const probeNetwork = async () => {
+    if (isScanningNetwork) return;
+    setIsScanningNetwork(true);
+    try {
+      let phoneIp = '';
+      if (typeof window !== 'undefined' && window.AndroidBridge?.getDeviceWifiIp) {
+        phoneIp = window.AndroidBridge.getDeviceWifiIp();
       }
-    };
 
-    probeNetwork();
-    const interval = setInterval(probeNetwork, 15000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
+      const subnets = [];
+      if (phoneIp && phoneIp.includes('.')) {
+        const parts = phoneIp.split('.');
+        subnets.push(`${parts[0]}.${parts[1]}.${parts[2]}`);
+      }
+      if (!subnets.includes('192.168.4')) subnets.push('192.168.4');
+      if (!subnets.includes('192.168.1')) subnets.push('192.168.1');
 
-  // 2. Camera QR Scanner Lifecycle (controlled via useEffect to guarantee mounted DOM element)
+      const found = [];
+      const candidateIps = [];
+      for (const subnet of subnets) {
+        candidateIps.push(
+          `${subnet}.1`, `${subnet}.39`, `${subnet}.50`, `${subnet}.100`,
+          `${subnet}.101`, `${subnet}.105`, `${subnet}.110`, `${subnet}.120`,
+          `${subnet}.150`, `${subnet}.200`
+        );
+      }
+
+      await Promise.allSettled(
+        candidateIps.map(async (ip) => {
+          try {
+            const res = await universalFetch(`http://${ip}:3500/api/device/info`, {
+              signal: AbortSignal.timeout(1500)
+            });
+            if (res.ok) {
+              const info = await res.json();
+              if (info.deviceId && !found.some(p => p.deviceId === info.deviceId)) {
+                found.push({
+                  deviceId: info.deviceId,
+                  deviceName: info.deviceName || 'PC Sentinel Host',
+                  url: `http://${ip}:3500`,
+                  ip: ip,
+                  shortCode: info.shortCode || info.deviceId.replace(/^SENT-/, '')
+                });
+              }
+            }
+          } catch (e) {}
+        })
+      );
+
+      setDiscoveredPCs(found);
+    } catch (err) {
+      console.warn('Network probe error:', err);
+    } finally {
+      setIsScanningNetwork(false);
+    }
+  };
+
+  // Camera QR Scanner Lifecycle (instant initialization with zero artificial delay)
   useEffect(() => {
     if (!isCameraActive) return;
 
@@ -116,7 +100,7 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
 
         await scannerInstance.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 220, height: 220 } },
+          { fps: 15, qrbox: { width: 240, height: 240 } },
           async (decodedText) => {
             if (isMounted) {
               await handleQrScanned(decodedText);
@@ -137,11 +121,10 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
       }
     };
 
-    const timer = setTimeout(startScanning, 150);
+    startScanning();
 
     return () => {
       isMounted = false;
-      clearTimeout(timer);
       if (scannerInstance) {
         try {
           scannerInstance.stop().catch(() => {});
@@ -259,7 +242,7 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
         return;
       }
 
-      // If not in discovered list yet, probe discovered machines on network
+      // If not in discovered list yet, probe candidate IPs across detected subnets in parallel
       let phoneIp = '';
       if (typeof window !== 'undefined' && window.AndroidBridge?.getDeviceWifiIp) {
         phoneIp = window.AndroidBridge.getDeviceWifiIp();
@@ -272,24 +255,27 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
       if (!subnets.includes('192.168.4')) subnets.push('192.168.4');
       if (!subnets.includes('192.168.1')) subnets.push('192.168.1');
 
-      let matched = null;
+      const candidateIps = [];
       for (const subnet of subnets) {
-        const candidateIps = [
+        candidateIps.push(
           `${subnet}.1`, `${subnet}.39`, `${subnet}.50`, `${subnet}.100`,
           `${subnet}.101`, `${subnet}.105`, `${subnet}.110`, `${subnet}.120`,
           `${subnet}.150`, `${subnet}.200`
-        ];
+        );
+      }
 
-        for (const ip of candidateIps) {
+      let matched = null;
+      const results = await Promise.allSettled(
+        candidateIps.map(async (ip) => {
           try {
             const res = await universalFetch(`http://${ip}:3500/api/device/info`, {
-              signal: AbortSignal.timeout(1200)
+              signal: AbortSignal.timeout(1500)
             });
             if (res.ok) {
               const info = await res.json();
               const sCode = (info.shortCode || info.deviceId?.replace(/^SENT-/, '') || '').toLowerCase();
               if (sCode === clean || info.deviceId?.toLowerCase() === raw.toLowerCase()) {
-                matched = {
+                return {
                   id: info.deviceId,
                   name: info.deviceName || 'PC Sentinel Machine',
                   hostUrl: `http://${ip}:3500`,
@@ -299,12 +285,18 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
                   isOffline: false,
                   lastSeen: new Date().toISOString()
                 };
-                break;
               }
             }
           } catch (e) {}
+          return null;
+        })
+      );
+
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value) {
+          matched = r.value;
+          break;
         }
-        if (matched) break;
       }
 
       if (matched) {
@@ -486,11 +478,20 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
               Nearby PCs on Wi-Fi
             </h3>
           </div>
-          {isScanningNetwork && (
+          {isScanningNetwork ? (
             <span className="text-[10px] text-cyan-400 flex items-center gap-1 font-mono">
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
               Scanning...
             </span>
+          ) : (
+            <button
+              type="button"
+              onClick={probeNetwork}
+              className="text-[10px] text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1 cursor-pointer"
+            >
+              <RefreshCw className="w-3 h-3 text-cyan-400" />
+              <span>Scan</span>
+            </button>
           )}
         </div>
 
@@ -529,12 +530,22 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
             ))}
           </div>
         ) : (
-          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 text-center">
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 text-center space-y-2">
             <p className="text-xs text-slate-400">
               {isScanningNetwork
                 ? 'Looking for running PC Sentinel hosts on local Wi-Fi...'
-                : 'No nearby hosts detected automatically. Scan the PC screen QR code or enter its 4-digit code.'}
+                : 'No nearby hosts currently scanned. Scan the QR code on your PC screen above or tap Scan below.'}
             </p>
+            {!isScanningNetwork && (
+              <button
+                type="button"
+                onClick={probeNetwork}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-xs font-semibold border border-slate-700 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Scan Wi-Fi Network</span>
+              </button>
+            )}
           </div>
         )}
       </div>

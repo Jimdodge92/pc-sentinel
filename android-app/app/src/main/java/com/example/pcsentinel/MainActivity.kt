@@ -212,8 +212,8 @@ class MainActivity : ComponentActivity() {
                 val url = java.net.URL(urlStr)
                 val conn = url.openConnection() as java.net.HttpURLConnection
                 conn.requestMethod = method.uppercase()
-                conn.connectTimeout = 4000
-                conn.readTimeout = 8000
+                conn.connectTimeout = 1500
+                conn.readTimeout = 4000
                 conn.instanceFollowRedirects = true
                 conn.setRequestProperty("User-Agent", "PCSentinelNativeAndroid/1.0")
 

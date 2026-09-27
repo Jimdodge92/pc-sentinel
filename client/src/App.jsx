@@ -40,7 +40,7 @@ export const getApiBase = () => {
   return '';
 };
 
-// Universal Fetch: uses native Android HTTP bridge when available to bypass all CORS/PNA restrictions
+// Universal Fetch: uses standard asynchronous fetch with native Android HTTP bridge fallback for CORS/PNA
 export async function universalFetch(url, options = {}) {
   let targetUrl = url;
   if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
@@ -50,29 +50,36 @@ export async function universalFetch(url, options = {}) {
     }
   }
 
-  if (typeof window !== 'undefined' && window.AndroidBridge?.httpFetch) {
-    try {
-      const method = options.method || 'GET';
-      const headersJson = options.headers ? JSON.stringify(options.headers) : null;
-      const body = typeof options.body === 'string' ? options.body : (options.body ? JSON.stringify(options.body) : null);
-      const resRaw = window.AndroidBridge.httpFetch(targetUrl, method, headersJson, body);
-      const parsed = JSON.parse(resRaw);
+  // 1. Try standard async fetch first (100% non-blocking in WebView, honors AbortSignal)
+  try {
+    const res = await fetch(targetUrl, options);
+    return res;
+  } catch (fetchErr) {
+    // 2. If standard fetch failed and Android bridge is available (e.g. WebView Private Network Access policy), fall back to native bridge
+    if (typeof window !== 'undefined' && window.AndroidBridge?.httpFetch) {
+      try {
+        const method = options.method || 'GET';
+        const headersJson = options.headers ? JSON.stringify(options.headers) : null;
+        const body = typeof options.body === 'string' ? options.body : (options.body ? JSON.stringify(options.body) : null);
+        const resRaw = window.AndroidBridge.httpFetch(targetUrl, method, headersJson, body);
+        const parsed = JSON.parse(resRaw);
 
-      if (!parsed.ok && parsed.status === 0) {
-        throw new Error(parsed.error || 'Network error');
+        if (!parsed.ok && parsed.status === 0) {
+          throw new Error(parsed.error || 'Network error');
+        }
+
+        return {
+          ok: parsed.ok,
+          status: parsed.status,
+          json: async () => JSON.parse(parsed.body),
+          text: async () => parsed.body
+        };
+      } catch (bridgeErr) {
+        throw fetchErr;
       }
-
-      return {
-        ok: parsed.ok,
-        status: parsed.status,
-        json: async () => JSON.parse(parsed.body),
-        text: async () => parsed.body
-      };
-    } catch (e) {
-      console.warn('Native httpFetch failed, falling back to standard fetch:', e);
     }
+    throw fetchErr;
   }
-  return fetch(targetUrl, options);
 }
 
 export default function App() {
@@ -300,7 +307,7 @@ export default function App() {
 
       let res;
       try {
-        res = await universalFetch(url, { headers, signal: AbortSignal.timeout(4000) });
+        res = await universalFetch(url, { headers, signal: AbortSignal.timeout(25000) });
       } catch (networkErr) {
         console.warn('Primary host unreachable, checking LAN / cloud / offline cache...', networkErr);
 
@@ -310,7 +317,7 @@ export default function App() {
           if (fallbackHost && fallbackHost !== activeHost) {
             try {
               const lanUrl = `${fallbackHost}/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
-              const lanRes = await universalFetch(lanUrl, { headers, signal: AbortSignal.timeout(4000) });
+              const lanRes = await universalFetch(lanUrl, { headers, signal: AbortSignal.timeout(15000) });
               if (lanRes.ok || lanRes.status === 401) {
                 res = lanRes;
               }
@@ -1051,6 +1058,27 @@ export default function App() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Initial Scan Progress State */}
+            {loading && !data && !error && (
+              <div className="bg-slate-900/90 border border-cyan-500/40 rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col items-center justify-center text-center space-y-4 my-4 animate-in fade-in duration-300">
+                <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                  <RefreshCw className="w-7 h-7 animate-spin text-cyan-400" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="font-extrabold text-white text-base sm:text-lg">
+                    Conducting Hardware & Event Log Scan
+                  </h3>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                    Analyzing Windows System events, hardware problem codes, and storage health telemetry. Initial scans on new machines take a few moments.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-cyan-300 font-mono bg-cyan-950/40 px-3 py-1.5 rounded-full border border-cyan-800/50">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                  <span>Target: {activeDevice?.name || 'Local Machine'}</span>
+                </div>
               </div>
             )}
 
