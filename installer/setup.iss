@@ -38,7 +38,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "C:\Program Files\nodejs\node.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
 
 ; PC Sentinel Server Code & Diagnostic Scripts (includes server/node_modules)
-Source: "{#SourceRootDir}\server\*"; DestDir: "{app}\server"; Excludes: "*.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceRootDir}\server\*"; DestDir: "{app}\server"; Excludes: "*.exe,config.json,lastShutdownIntent.json,resolvedIncidents.json,restart.trigger"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Compiled Client Web Assets (Served by Express)
 Source: "{#SourceRootDir}\client\dist\*"; DestDir: "{app}\client\dist"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Application Icons & Assets

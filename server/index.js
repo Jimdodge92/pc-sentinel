@@ -775,6 +775,7 @@ app.get('/api/device/info', (req, res) => {
   const device = getOrInitDevice();
   const localIp = getLocalIp();
   const reqHost = req.headers.host || `${localIp}:${PORT}`;
+  const hostForExternal = (reqHost.includes('localhost') || reqHost.includes('127.0.0.1')) ? `${localIp}:${PORT}` : reqHost;
   const protocol = req.protocol || 'http';
   const apkPath = path.join(__dirname, 'public/pc-sentinel.apk');
   const apkExists = fs.existsSync(apkPath);
@@ -788,7 +789,7 @@ app.get('/api/device/info', (req, res) => {
     id: device.deviceId,
     code: shortCode,
     name: device.deviceName,
-    url: `${protocol}://${reqHost}`
+    url: `${protocol}://${hostForExternal}`
   });
 
   res.json({
@@ -797,11 +798,11 @@ app.get('/api/device/info', (req, res) => {
     qrPayload,
     localIp,
     port: PORT,
-    pairingUrl: `${protocol}://${reqHost}?pair=${device.deviceId}`,
-    apkDownloadUrl: `${protocol}://${reqHost}/download/pc-sentinel.apk`,
+    pairingUrl: `${protocol}://${hostForExternal}?pair=${device.deviceId}`,
+    apkDownloadUrl: `${protocol}://${hostForExternal}/download/pc-sentinel.apk`,
     apkExists,
     apkSizeMB,
-    installerDownloadUrl: `${protocol}://${reqHost}/download/PC-Sentinel-Setup.exe`,
+    installerDownloadUrl: `${protocol}://${hostForExternal}/download/PC-Sentinel-Setup.exe`,
     installerExists: exeExists,
     installerSizeMB: exeSizeMB
   });

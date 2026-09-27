@@ -47,7 +47,7 @@ function getOrInitDevice() {
   }
 
   if (!cfg.deviceName) {
-    cfg.deviceName = os.hostname() || 'Jims-ThinkPad';
+    cfg.deviceName = os.hostname() || 'PC-Sentinel-Host';
     changed = true;
   }
 

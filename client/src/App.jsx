@@ -31,21 +31,30 @@ export const getApiBase = () => {
     const stored = localStorage.getItem('sentinel_host_url');
     if (stored) return stored.replace(/\/+$/, '');
     if (isAndroidNative()) {
-      // Default to Local Wi-Fi (192.168.4.39:3500)
-      return 'http://192.168.4.39:3500';
+      return '';
     }
+    // Web browser running on PC / localhost
+    return window.location.origin;
   }
   return '';
 };
 
 // Universal Fetch: uses native Android HTTP bridge when available to bypass all CORS/PNA restrictions
 export async function universalFetch(url, options = {}) {
+  let targetUrl = url;
+  if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+    const base = getApiBase();
+    if (base) {
+      targetUrl = `${base}${targetUrl.startsWith('/') ? '' : '/'}${targetUrl}`;
+    }
+  }
+
   if (typeof window !== 'undefined' && window.AndroidBridge?.httpFetch) {
     try {
       const method = options.method || 'GET';
       const headersJson = options.headers ? JSON.stringify(options.headers) : null;
       const body = typeof options.body === 'string' ? options.body : (options.body ? JSON.stringify(options.body) : null);
-      const resRaw = window.AndroidBridge.httpFetch(url, method, headersJson, body);
+      const resRaw = window.AndroidBridge.httpFetch(targetUrl, method, headersJson, body);
       const parsed = JSON.parse(resRaw);
 
       if (!parsed.ok && parsed.status === 0) {
@@ -62,7 +71,7 @@ export async function universalFetch(url, options = {}) {
       console.warn('Native httpFetch failed, falling back to standard fetch:', e);
     }
   }
-  return fetch(url, options);
+  return fetch(targetUrl, options);
 }
 
 export default function App() {
@@ -78,24 +87,35 @@ export default function App() {
   const [fleet, setFleet] = useState(() => {
     try {
       const saved = localStorage.getItem('sentinel_device_fleet');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    const defaultHost = getApiBase() || 'http://192.168.4.39:3500';
-    return [
-      {
-        id: localStorage.getItem('sentinel_device_id') || 'SENT-2541',
-        name: "Jim's ThinkPad",
-        hostUrl: defaultHost,
-        lanIps: [defaultHost],
-        wanUrl: 'http://173.18.4.217:3500',
-        status: 'healthy',
-        isDefault: true,
-        lastSeen: new Date().toISOString()
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-    ];
+    } catch (e) {}
+
+    // When running on PC (browser / desktop service):
+    if (!isAndroidNative()) {
+      const localOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3500';
+      return [
+        {
+          id: localStorage.getItem('sentinel_device_id') || 'local-host',
+          name: 'This PC',
+          hostUrl: localOrigin,
+          lanIps: [localOrigin],
+          status: 'healthy',
+          isDefault: true,
+          lastSeen: new Date().toISOString()
+        }
+      ];
+    }
+
+    // In Android companion:
+    return [];
   });
   const [activeDeviceId, setActiveDeviceId] = useState(() => {
-    return localStorage.getItem('sentinel_active_device_id') || 'SENT-2541';
+    const savedId = localStorage.getItem('sentinel_active_device_id');
+    if (savedId) return savedId;
+    return !isAndroidNative() ? (localStorage.getItem('sentinel_device_id') || 'local-host') : '';
   });
   const [isAddDeviceModalOpen, setIsAddDeviceModalOpen] = useState(false);
   const [isFleetManagerModalOpen, setIsFleetManagerModalOpen] = useState(false);
@@ -191,18 +211,37 @@ export default function App() {
         }
 
         // Keep fleet entry synced with real hardware hostname
-        setFleet(prev => prev.map(d => {
-          if (d.id === json.deviceId || d.id === activeDeviceId) {
-            return {
-              ...d,
-              id: json.deviceId || d.id,
-              name: json.deviceName || d.name,
-              lanIps: json.localIp ? [json.localIp] : d.lanIps,
-              status: json.overallHealth?.status || d.status
-            };
+        setFleet(prev => {
+          if (prev.length === 0) {
+            return [{
+              id: json.deviceId || 'local-host',
+              name: json.deviceName || 'This PC',
+              hostUrl: base || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3500'),
+              lanIps: json.localIp ? [json.localIp] : [],
+              status: json.overallHealth?.status || 'healthy',
+              isDefault: true,
+              lastSeen: new Date().toISOString()
+            }];
           }
-          return d;
-        }));
+          return prev.map(d => {
+            if (d.id === 'local-host' || d.id === json.deviceId || d.id === activeDeviceId || d.isDefault) {
+              return {
+                ...d,
+                id: json.deviceId || d.id,
+                name: json.deviceName || d.name,
+                hostUrl: d.hostUrl || base,
+                lanIps: json.localIp ? [json.localIp] : d.lanIps,
+                status: json.overallHealth?.status || d.status
+              };
+            }
+            return d;
+          });
+        });
+
+        if (activeDeviceId === 'local-host' && json.deviceId) {
+          setActiveDeviceId(json.deviceId);
+          localStorage.setItem('sentinel_active_device_id', json.deviceId);
+        }
       }
     } catch (e) {
       console.warn('Failed to fetch device info:', e);
@@ -213,7 +252,7 @@ export default function App() {
     try {
       setLoading(true);
       setError(null);
-      const activeHost = overrideHost || currentHost || getApiBase();
+      const activeHost = overrideHost || activeDevice?.hostUrl || currentHost || getApiBase();
       const url = `${activeHost}/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
       const headers = {};
       if (activePin) {
@@ -226,17 +265,19 @@ export default function App() {
       } catch (networkErr) {
         console.warn('Primary host unreachable, checking LAN / cloud / offline cache...', networkErr);
 
-        // If in Android native companion and default WAN IP failed, try local LAN IP (e.g. user is on home Wi-Fi)
-        if (isAndroidNative() && !localStorage.getItem('sentinel_host_url')) {
-          try {
-            const lanUrl = `http://192.168.4.39:3500/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
-            const lanRes = await universalFetch(lanUrl, { headers, signal: AbortSignal.timeout(4000) });
-            if (lanRes.ok || lanRes.status === 401) {
-              localStorage.setItem('sentinel_host_url', 'http://192.168.4.39:3500');
-              res = lanRes;
+        // If in Android native companion and primary host failed, try local LAN IP if stored
+        if (isAndroidNative()) {
+          const fallbackHost = activeDevice?.lanIps?.[0] || activeDevice?.hostUrl;
+          if (fallbackHost && fallbackHost !== activeHost) {
+            try {
+              const lanUrl = `${fallbackHost}/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
+              const lanRes = await universalFetch(lanUrl, { headers, signal: AbortSignal.timeout(4000) });
+              if (lanRes.ok || lanRes.status === 401) {
+                res = lanRes;
+              }
+            } catch (lanErr) {
+              // Keep original networkErr
             }
-          } catch (lanErr) {
-            // Keep original networkErr
           }
         }
 
@@ -970,7 +1011,7 @@ export default function App() {
                     <strong>Connection Issue: </strong>
                     <span>{error}</span>
                     <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                      Target Server: {getApiBase() || 'Not set'}
+                      Target Machine: {activeDevice?.name || 'Local Machine'} ({activeDevice?.hostUrl || getApiBase() || 'http://localhost:3500'})
                     </div>
                   </div>
                 </div>
