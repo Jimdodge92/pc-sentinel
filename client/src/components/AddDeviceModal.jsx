@@ -192,16 +192,19 @@ export default function AddDeviceModal({ isOpen, onClose, onDeviceAdded, existin
     }
   };
 
+  const [resolvingCode, setResolvingCode] = useState('');
+
   const resolveAndAddByCode = async (codeToResolve) => {
     const raw = (codeToResolve || pairingCodeInput).trim();
     if (!raw) return;
 
     setIsResolving(true);
+    setResolvingCode(raw);
     setResolveError(null);
     setMatchedDevice(null);
 
     try {
-      // 1. Check discovered peers on local network first
+      // 1. Fast in-memory check: discovered peers
       const cleanCode = raw.toLowerCase().replace(/^sent-/, '');
       const localMatch = discoveredPeers.find(p =>
         (p.shortCode && p.shortCode.toLowerCase() === cleanCode) ||
@@ -213,6 +216,7 @@ export default function AddDeviceModal({ isOpen, onClose, onDeviceAdded, existin
           id: localMatch.deviceId,
           name: localMatch.deviceName,
           hostUrl: localMatch.url,
+          lanUrl: localMatch.url,
           lanIps: [localMatch.ip],
           status: 'healthy',
           isOffline: false,
@@ -221,67 +225,88 @@ export default function AddDeviceModal({ isOpen, onClose, onDeviceAdded, existin
         return;
       }
 
-      // 2. Query active server's fleet resolver (if on LAN)
-      try {
-        const res = await universalFetch(`${getApiBase()}/api/fleet/resolve/${encodeURIComponent(raw)}`, {
-          signal: AbortSignal.timeout(2000)
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.found && data.device) {
-            addDeviceToFleet({
-              id: data.device.deviceId,
-              name: data.device.deviceName,
-              hostUrl: data.device.url,
-              lanIps: [data.device.ip],
-              status: 'healthy',
-              isOffline: false,
-              lastSeen: new Date().toISOString()
-            });
-            return;
-          }
-        }
-      } catch (lanResolveErr) {}
-
-      // 3. Query Universal Zero-Config Cloud Relay (Global Cross-Network Link)
-      try {
-        const relayRes = await universalFetch(`https://ntfy.sh/pcsentinel-pair-${cleanCode}/json?poll=1`, {
-          signal: AbortSignal.timeout(4500)
-        });
-        if (relayRes.ok) {
-          const text = await relayRes.text();
-          const lines = text.trim().split('\n').filter(Boolean);
-          for (let i = lines.length - 1; i >= 0; i--) {
-            try {
-              const lastMsg = JSON.parse(lines[i]);
-              if (lastMsg.message) {
-                const record = JSON.parse(lastMsg.message);
-                if (record.deviceId) {
-                  addDeviceToFleet({
-                    id: record.deviceId,
-                    name: record.deviceName || 'PC Sentinel Machine',
-                    hostUrl: record.lanUrl || '',
-                    lanIps: record.lanIps || [],
-                    relayTopic: record.relayTopic || `pcsentinel-telemetry-${record.deviceId}`,
-                    isCloudRelayed: true,
-                    status: record.status || 'healthy',
-                    isOffline: false,
-                    lastSeen: record.lastSeen || new Date().toISOString()
-                  });
-                  return;
+      // 2. Parallel Race: Query Universal Cloud Relay and active server LAN resolver simultaneously
+      const queryCloudRelay = async () => {
+        try {
+          const relayRes = await universalFetch(`https://ntfy.sh/pcsentinel-pair-${cleanCode}/json?poll=1`, {
+            signal: AbortSignal.timeout(4500)
+          });
+          if (relayRes.ok) {
+            const text = await relayRes.text();
+            const lines = text.trim().split('\n').filter(Boolean);
+            for (let i = lines.length - 1; i >= 0; i--) {
+              try {
+                const lastMsg = JSON.parse(lines[i]);
+                if (lastMsg.message) {
+                  const record = JSON.parse(lastMsg.message);
+                  if (record.deviceId) {
+                    return {
+                      id: record.deviceId,
+                      name: record.deviceName || 'PC Sentinel Machine',
+                      hostUrl: record.lanUrl || record.wanUrl || '',
+                      lanUrl: record.lanUrl || '',
+                      wanUrl: record.wanUrl || null,
+                      lanIps: record.lanIps || [],
+                      relayTopic: record.relayTopic || `pcsentinel-telemetry-${record.deviceId}`,
+                      isCloudRelayed: true,
+                      status: record.status || 'healthy',
+                      isOffline: false,
+                      lastSeen: record.lastSeen || new Date().toISOString()
+                    };
+                  }
                 }
-              }
-            } catch (e) {}
+              } catch (e) {}
+            }
           }
-        }
-      } catch (cloudErr) {
-        console.warn('Cloud relay pairing lookup notice:', cloudErr);
+        } catch (cloudErr) {}
+        return null;
+      };
+
+      const queryLanResolver = async () => {
+        try {
+          const res = await universalFetch(`${getApiBase()}/api/fleet/resolve/${encodeURIComponent(raw)}`, {
+            signal: AbortSignal.timeout(1800)
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.found && data.device) {
+              return {
+                id: data.device.deviceId,
+                name: data.device.deviceName,
+                hostUrl: data.device.url,
+                lanUrl: data.device.url,
+                lanIps: [data.device.ip],
+                status: 'healthy',
+                isOffline: false,
+                lastSeen: new Date().toISOString()
+              };
+            }
+          }
+        } catch (e) {}
+        return null;
+      };
+
+      // Race Cloud Relay vs LAN resolver
+      let matched = null;
+      try {
+        matched = await Promise.race([
+          queryCloudRelay().then(res => res ? Promise.resolve(res) : new Promise(() => {})),
+          queryLanResolver().then(res => res ? Promise.resolve(res) : new Promise(() => {})),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+        ]);
+      } catch (raceErr) {
+        const [cloud, lan] = await Promise.all([queryCloudRelay(), queryLanResolver()]);
+        matched = cloud || lan;
+      }
+
+      if (matched) {
+        addDeviceToFleet(matched);
+        return;
       }
 
       throw new Error(`No PC Sentinel machine found with code "${raw}". Ensure PC Sentinel is running on the computer.`);
     } catch (err) {
-      setResolveError(err.message);
+      setResolveError(err.message || 'Could not find PC Sentinel host. Verify code and ensure desktop app is active.');
     } finally {
       setIsResolving(false);
     }
@@ -659,6 +684,45 @@ export default function AddDeviceModal({ isOpen, onClose, onDeviceAdded, existin
           </button>
         </div>
       </div>
+
+      {/* High-Tech Animated Connecting & Pairing Modal Overlay */}
+      {isResolving && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-cyan-500/40 rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl shadow-cyan-950/60 space-y-5">
+            {/* Animated Radar Rings */}
+            <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-2 border-cyan-500/20 animate-ping duration-1000" />
+              <div className="absolute inset-2 rounded-full border border-cyan-400/40 animate-pulse" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 shadow-lg shadow-cyan-500/30">
+                <Laptop className="w-8 h-8 text-white animate-bounce" />
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-white">Connecting to PC...</h3>
+              <p className="text-xs text-cyan-400 font-mono mt-1">Code: {resolvingCode || pairingCodeInput || '4-Digit Code'}</p>
+            </div>
+
+            <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-[11px] text-slate-300 space-y-2 text-left">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+                <span className="font-semibold text-white">Establishing Connection...</span>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-normal pl-5">
+                Linking via Cloud Relay & local network across Wi-Fi, 5G, or cellular without entering IP addresses.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsResolving(false)}
+              className="px-4 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

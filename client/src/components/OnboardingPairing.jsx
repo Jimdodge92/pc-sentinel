@@ -227,18 +227,21 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
   };
 
   // 4. Resolve and pair by 4-digit code
+  const [resolvingCode, setResolvingCode] = useState('');
+
   const handlePinSubmit = async (codeOverride = null) => {
     const raw = (codeOverride || pinCode).trim();
     if (!raw) return;
 
     setIsResolving(true);
+    setResolvingCode(raw);
     setErrorMsg(null);
     setSuccessMsg(null);
 
     try {
       const clean = raw.toLowerCase().replace(/^sent-/, '');
 
-      // Check discovered PCs on local Wi-Fi first
+      // 1. Check discovered PCs on local Wi-Fi first (in-memory, 0ms)
       const peer = discoveredPCs.find(p =>
         (p.shortCode && p.shortCode.toLowerCase() === clean) ||
         (p.deviceId && p.deviceId.toLowerCase() === raw.toLowerCase())
@@ -249,6 +252,7 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
           id: peer.deviceId,
           name: peer.deviceName,
           hostUrl: peer.url,
+          lanUrl: peer.url,
           lanIps: [peer.ip],
           status: 'healthy',
           isDefault: true,
@@ -258,61 +262,112 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
         return;
       }
 
-      // If not in discovered list yet, probe candidate IPs across detected subnets in parallel (short 1200ms timeout)
-      let phoneIp = '';
-      if (typeof window !== 'undefined' && window.AndroidBridge?.getDeviceWifiIp) {
-        phoneIp = window.AndroidBridge.getDeviceWifiIp();
-      }
-      const subnets = [];
-      if (phoneIp && phoneIp.includes('.')) {
-        const parts = phoneIp.split('.');
-        subnets.push(`${parts[0]}.${parts[1]}.${parts[2]}`);
-      }
-      if (!subnets.includes('192.168.4')) subnets.push('192.168.4');
-      if (!subnets.includes('192.168.1')) subnets.push('192.168.1');
-
-      const candidateIps = [];
-      for (const subnet of subnets) {
-        candidateIps.push(
-          `${subnet}.1`, `${subnet}.39`, `${subnet}.50`, `${subnet}.100`,
-          `${subnet}.101`, `${subnet}.105`, `${subnet}.110`, `${subnet}.120`,
-          `${subnet}.150`, `${subnet}.200`
-        );
-      }
-
-      let matched = null;
-      const results = await Promise.allSettled(
-        candidateIps.map(async (ip) => {
-          try {
-            const res = await universalFetch(`http://${ip}:3500/api/device/info`, {
-              signal: AbortSignal.timeout(1200)
-            });
-            if (res.ok) {
-              const info = await res.json();
-              const sCode = (info.shortCode || info.deviceId?.replace(/^SENT-/, '') || '').toLowerCase();
-              if (sCode === clean || info.deviceId?.toLowerCase() === raw.toLowerCase()) {
-                return {
-                  id: info.deviceId,
-                  name: info.deviceName || 'PC Sentinel Machine',
-                  hostUrl: `http://${ip}:3500`,
-                  lanIps: [ip],
-                  status: 'healthy',
-                  isDefault: true,
-                  isOffline: false,
-                  lastSeen: new Date().toISOString()
-                };
-              }
+      // 2. Parallel Race: Query Universal Cloud Relay and LAN probe simultaneously
+      const queryCloudRelay = async () => {
+        try {
+          const relayRes = await universalFetch(`https://ntfy.sh/pcsentinel-pair-${clean}/json?poll=1`, {
+            signal: AbortSignal.timeout(4500)
+          });
+          if (relayRes.ok) {
+            const text = await relayRes.text();
+            const lines = text.trim().split('\n').filter(Boolean);
+            for (let i = lines.length - 1; i >= 0; i--) {
+              try {
+                const lastMsg = JSON.parse(lines[i]);
+                if (lastMsg.message) {
+                  const record = JSON.parse(lastMsg.message);
+                  if (record.deviceId) {
+                    return {
+                      id: record.deviceId,
+                      name: record.deviceName || 'PC Sentinel Machine',
+                      hostUrl: record.lanUrl || record.wanUrl || '',
+                      lanUrl: record.lanUrl || '',
+                      wanUrl: record.wanUrl || null,
+                      lanIps: record.lanIps || [],
+                      relayTopic: record.relayTopic || `pcsentinel-telemetry-${record.deviceId}`,
+                      isCloudRelayed: true,
+                      status: record.status || 'healthy',
+                      isDefault: true,
+                      isOffline: false,
+                      lastSeen: record.lastSeen || new Date().toISOString()
+                    };
+                  }
+                }
+              } catch (lineErr) {}
             }
-          } catch (e) {}
-          return null;
-        })
-      );
+          }
+        } catch (cloudErr) {}
+        return null;
+      };
 
-      for (const r of results) {
-        if (r.status === 'fulfilled' && r.value) {
-          matched = r.value;
-          break;
+      const queryLanSubnet = async () => {
+        let phoneIp = '';
+        if (typeof window !== 'undefined' && window.AndroidBridge?.getDeviceWifiIp) {
+          phoneIp = window.AndroidBridge.getDeviceWifiIp();
         }
+        const subnets = [];
+        if (phoneIp && phoneIp.includes('.')) {
+          const parts = phoneIp.split('.');
+          subnets.push(`${parts[0]}.${parts[1]}.${parts[2]}`);
+        }
+        if (!subnets.includes('192.168.4')) subnets.push('192.168.4');
+        if (!subnets.includes('192.168.1')) subnets.push('192.168.1');
+
+        const candidateIps = [];
+        for (const subnet of subnets) {
+          candidateIps.push(
+            `${subnet}.1`, `${subnet}.39`, `${subnet}.50`, `${subnet}.100`,
+            `${subnet}.101`, `${subnet}.105`, `${subnet}.110`, `${subnet}.120`,
+            `${subnet}.150`, `${subnet}.200`
+          );
+        }
+
+        const results = await Promise.allSettled(
+          candidateIps.map(async (ip) => {
+            try {
+              const res = await universalFetch(`http://${ip}:3500/api/device/info`, {
+                signal: AbortSignal.timeout(1500)
+              });
+              if (res.ok) {
+                const info = await res.json();
+                const sCode = (info.shortCode || info.deviceId?.replace(/^SENT-/, '') || '').toLowerCase();
+                if (sCode === clean || info.deviceId?.toLowerCase() === raw.toLowerCase()) {
+                  return {
+                    id: info.deviceId,
+                    name: info.deviceName || 'PC Sentinel Machine',
+                    hostUrl: `http://${ip}:3500`,
+                    lanUrl: `http://${ip}:3500`,
+                    lanIps: [ip],
+                    status: 'healthy',
+                    isDefault: true,
+                    isOffline: false,
+                    lastSeen: new Date().toISOString()
+                  };
+                }
+              }
+            } catch (e) {}
+            return null;
+          })
+        );
+
+        for (const r of results) {
+          if (r.status === 'fulfilled' && r.value) return r.value;
+        }
+        return null;
+      };
+
+      // Race Cloud Relay vs LAN: whichever returns a valid machine first wins!
+      let matched = null;
+      try {
+        matched = await Promise.race([
+          queryCloudRelay().then(res => res ? Promise.resolve(res) : new Promise(() => {})),
+          queryLanSubnet().then(res => res ? Promise.resolve(res) : new Promise(() => {})),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+        ]);
+      } catch (raceErr) {
+        // Fallback: wait for both to conclude
+        const [cloud, lan] = await Promise.all([queryCloudRelay(), queryLanSubnet()]);
+        matched = cloud || lan;
       }
 
       if (matched) {
@@ -320,45 +375,9 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
         return;
       }
 
-      // If local LAN probe did not match, query the Global Universal Cloud Relay
-      try {
-        const relayRes = await universalFetch(`https://ntfy.sh/pcsentinel-pair-${clean}/json?poll=1`, {
-          signal: AbortSignal.timeout(4500)
-        });
-        if (relayRes.ok) {
-          const text = await relayRes.text();
-          const lines = text.trim().split('\n').filter(Boolean);
-          for (let i = lines.length - 1; i >= 0; i--) {
-            try {
-              const lastMsg = JSON.parse(lines[i]);
-              if (lastMsg.message) {
-                const record = JSON.parse(lastMsg.message);
-                if (record.deviceId) {
-                  completePairing({
-                    id: record.deviceId,
-                    name: record.deviceName || 'PC Sentinel Machine',
-                    hostUrl: record.lanUrl || '',
-                    lanIps: record.lanIps || [],
-                    relayTopic: record.relayTopic || `pcsentinel-telemetry-${record.deviceId}`,
-                    isCloudRelayed: true,
-                    status: record.status || 'healthy',
-                    isDefault: true,
-                    isOffline: false,
-                    lastSeen: record.lastSeen || new Date().toISOString()
-                  });
-                  return;
-                }
-              }
-            } catch (lineErr) {}
-          }
-        }
-      } catch (cloudErr) {
-        console.warn('Cloud relay pairing in onboarding notice:', cloudErr);
-      }
-
       throw new Error(`No PC Sentinel machine found with code "${raw}". Ensure PC Sentinel is running on your computer.`);
     } catch (err) {
-      setErrorMsg(err.message);
+      setErrorMsg(err.message || 'Could not find PC Sentinel host. Verify code and ensure desktop app is active.');
     } finally {
       setIsResolving(false);
     }
@@ -612,6 +631,45 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
           <span>Reset Companion App Cache</span>
         </button>
       </div>
+
+      {/* High-Tech Animated Connecting & Pairing Modal Overlay */}
+      {isResolving && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-cyan-500/40 rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl shadow-cyan-950/60 space-y-5">
+            {/* Animated Radar Rings */}
+            <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-2 border-cyan-500/20 animate-ping duration-1000" />
+              <div className="absolute inset-2 rounded-full border border-cyan-400/40 animate-pulse" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 shadow-lg shadow-cyan-500/30">
+                <Laptop className="w-8 h-8 text-white animate-bounce" />
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-white">Connecting to PC...</h3>
+              <p className="text-xs text-cyan-400 font-mono mt-1">Code: {resolvingCode || pinCode || '4-Digit Code'}</p>
+            </div>
+
+            <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-[11px] text-slate-300 space-y-2 text-left">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+                <span className="font-semibold text-white">Establishing Connection...</span>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-normal pl-5">
+                Linking via Cloud Relay & local network across Wi-Fi, 5G, or cellular without entering IP addresses.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsResolving(false)}
+              className="px-4 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

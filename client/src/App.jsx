@@ -328,7 +328,7 @@ export default function App() {
       }
 
       let res;
-      const lanTimeoutMs = (activeDevice?.isCloudRelayed) ? 4000 : 25000;
+      const lanTimeoutMs = (activeDevice?.isCloudRelayed) ? 2500 : 25000;
       try {
         res = await universalFetch(url, { headers, signal: AbortSignal.timeout(lanTimeoutMs) });
       } catch (networkErr) {
@@ -336,17 +336,28 @@ export default function App() {
 
         // If in Android native companion and primary host failed, try local LAN IP if stored
         if (isAndroidNative()) {
-          const fallbackHost = activeDevice?.lanIps?.[0] || activeDevice?.hostUrl;
+          const fallbackHost = activeDevice?.lanIps?.[0] || activeDevice?.lanUrl;
           if (fallbackHost && fallbackHost !== activeHost) {
             try {
               const lanUrl = `${fallbackHost}/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
-              const lanRes = await universalFetch(lanUrl, { headers, signal: AbortSignal.timeout(4000) });
+              const lanRes = await universalFetch(lanUrl, { headers, signal: AbortSignal.timeout(2500) });
               if (lanRes.ok || lanRes.status === 401) {
                 res = lanRes;
               }
             } catch (lanErr) {
               // Keep original networkErr
             }
+          }
+
+          // Try public WAN URL if available (e.g. cellular LTE access)
+          if (!res && activeDevice?.wanUrl && activeDevice.wanUrl !== activeHost) {
+            try {
+              const wanUrl = `${activeDevice.wanUrl}/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
+              const wanRes = await universalFetch(wanUrl, { headers, signal: AbortSignal.timeout(3000) });
+              if (wanRes.ok || wanRes.status === 401) {
+                res = wanRes;
+              }
+            } catch (wanErr) {}
           }
         }
 
