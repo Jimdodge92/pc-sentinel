@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.util.Log
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
+import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -35,17 +36,17 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private val channelId = "pc_sentinel_critical_alerts"
 
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        // Notification permission handled
+    private val requestPermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        // Permissions handled
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         createNotificationChannel()
-        checkNotificationPermission()
+        checkAppPermissions()
 
         window.statusBarColor = Color.parseColor("#090d16")
         window.navigationBarColor = Color.parseColor("#090d16")
@@ -80,6 +81,12 @@ class MainActivity : ComponentActivity() {
                 override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
                     Log.d("PCSentinelWebView", "${consoleMessage?.message()} [${consoleMessage?.sourceId()}:${consoleMessage?.lineNumber()}]")
                     return true
+                }
+
+                override fun onPermissionRequest(request: PermissionRequest?) {
+                    runOnUiThread {
+                        request?.grant(request.resources)
+                    }
                 }
             }
 
@@ -124,11 +131,21 @@ class MainActivity : ComponentActivity() {
         setContentView(rootLayout)
     }
 
-    private fun checkNotificationPermission() {
+    private fun checkAppPermissions() {
+        val permissionsNeeded = mutableListOf<String>()
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                permissionsNeeded.add(Manifest.permission.POST_NOTIFICATIONS)
             }
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.CAMERA)
+        }
+
+        if (permissionsNeeded.isNotEmpty()) {
+            requestPermissionsLauncher.launch(permissionsNeeded.toTypedArray())
         }
     }
 

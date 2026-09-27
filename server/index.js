@@ -13,9 +13,11 @@ const {
   startFirebaseHeartbeat,
   triggerEmergencyPush
 } = require('./devicePairing');
+const { FleetDiscovery } = require('./fleetDiscovery');
 
 const app = express();
 const PORT = process.env.PORT || 3500;
+let fleetDiscovery = null;
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -781,8 +783,18 @@ app.get('/api/device/info', (req, res) => {
   const exeExists = fs.existsSync(exePath);
   const exeSizeMB = exeExists ? (fs.statSync(exePath).size / (1024 * 1024)).toFixed(1) : null;
 
+  const shortCode = device.deviceId ? device.deviceId.replace(/^SENT-/, '') : '';
+  const qrPayload = JSON.stringify({
+    id: device.deviceId,
+    code: shortCode,
+    name: device.deviceName,
+    url: `${protocol}://${reqHost}`
+  });
+
   res.json({
     ...device,
+    shortCode,
+    qrPayload,
     localIp,
     port: PORT,
     pairingUrl: `${protocol}://${reqHost}?pair=${device.deviceId}`,
@@ -793,6 +805,35 @@ app.get('/api/device/info', (req, res) => {
     installerExists: exeExists,
     installerSizeMB: exeSizeMB
   });
+});
+
+/**
+ * Zero-IP Fleet Discovery Endpoints
+ */
+app.get('/api/fleet/discovered', (req, res) => {
+  const peers = fleetDiscovery ? fleetDiscovery.getDiscoveredPeers() : [];
+  const dev = getOrInitDevice();
+  const localIp = getLocalIp();
+  res.json({
+    peers,
+    self: {
+      deviceId: dev.deviceId,
+      shortCode: dev.deviceId ? dev.deviceId.replace(/^SENT-/, '') : '',
+      deviceName: dev.deviceName,
+      localIp,
+      port: PORT,
+      url: `http://${localIp}:${PORT}`
+    }
+  });
+});
+
+app.get('/api/fleet/resolve/:code', (req, res) => {
+  const { code } = req.params;
+  const match = fleetDiscovery ? fleetDiscovery.resolveCode(code) : null;
+  if (match) {
+    return res.json({ found: true, device: match });
+  }
+  res.status(404).json({ found: false, error: 'No PC Sentinel machine found with that code on the local network.' });
 });
 
 /**
@@ -868,6 +909,14 @@ app.listen(PORT, () => {
   console.log(` PC Sentinel Autonomous Server Active`);
   console.log(` Local Dashboard: http://localhost:${PORT}`);
   console.log(`=================================================`);
+
+  // Start Local UDP Fleet Discovery Engine
+  try {
+    fleetDiscovery = new FleetDiscovery(getOrInitDevice, getLocalIp, PORT);
+    fleetDiscovery.start();
+  } catch (e) {
+    console.warn('[FleetDiscovery] Init warning:', e.message);
+  }
 
   // Start Heartbeat interval for active SSE clients (every 5 seconds)
   setInterval(() => {

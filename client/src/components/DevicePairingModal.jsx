@@ -11,7 +11,7 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
   const [deviceInfo, setDeviceInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState('apk'); // 'apk' | 'web' | 'settings'
+  const [activeTab, setActiveTab] = useState('pair'); // 'pair' | 'apk' | 'windows' | 'settings'
 
   // Cloud Config Form State
   const [projectIdInput, setProjectIdInput] = useState('');
@@ -141,6 +141,17 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
         {/* Tab Selector */}
         <div className="flex border-b border-slate-800 bg-slate-950/30 px-6 gap-2 text-xs font-medium overflow-x-auto">
           <button
+            onClick={() => setActiveTab('pair')}
+            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'pair'
+                ? 'border-cyan-400 text-cyan-300 font-semibold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <QrCode className="w-4 h-4 text-cyan-400" />
+            <span>Pair Phone & Fleet</span>
+          </button>
+          <button
             onClick={() => setActiveTab('apk')}
             className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
               activeTab === 'apk'
@@ -161,17 +172,6 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
           >
             <Laptop className="w-4 h-4 text-blue-400" />
             <span>Windows Setup (.exe)</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('web')}
-            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'web'
-                ? 'border-cyan-400 text-cyan-300 font-semibold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <QrCode className="w-4 h-4" />
-            <span>Web Companion</span>
           </button>
           <button
             onClick={() => setActiveTab('settings')}
@@ -312,56 +312,62 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
             </div>
           )}
 
-          {/* 3. Web Companion Tab */}
-          {activeTab === 'web' && (
+          {/* 1. Phone & Fleet Pairing Tab */}
+          {activeTab === 'pair' && (
             <div className="space-y-6">
               {/* QR Code and Device Code Card */}
-              <div className="flex flex-col sm:flex-row items-center gap-6 p-5 rounded-xl bg-slate-950/70 border border-slate-800 shadow-inner">
+              <div className="flex flex-col sm:flex-row items-center gap-6 p-5 rounded-xl bg-slate-950/70 border border-cyan-500/30 shadow-inner">
                 {/* QR Code */}
                 <div className="p-3.5 bg-white rounded-xl shadow-xl shrink-0 flex flex-col items-center">
                   <QRCodeSVG
-                    value={pairingUrl}
-                    size={150}
+                    value={deviceInfo?.qrPayload || pairingUrl}
+                    size={160}
                     level="M"
                     includeMargin={false}
                   />
-                  <span className="text-[10px] text-slate-700 font-mono mt-2 font-bold tracking-wider">
-                    {pairingCode}
+                  <span className="text-[10px] text-slate-800 font-mono mt-2 font-bold tracking-wider">
+                    SCAN IN APP TO PAIR
                   </span>
                 </div>
 
                 {/* Pairing Code & Steps */}
                 <div className="space-y-3 flex-1 w-full text-center sm:text-left">
-                  <span className="text-[11px] text-slate-400 font-medium uppercase tracking-wider block">
-                    Your 6-Character Device Pairing Code
-                  </span>
-
-                  <div className="flex items-center justify-center sm:justify-start gap-2">
-                    <span className="text-2xl font-black font-mono tracking-widest text-cyan-400 bg-cyan-950/50 border border-cyan-800/80 px-3.5 py-1.5 rounded-lg shadow-sm">
-                      {pairingCode}
+                  <div>
+                    <span className="text-[11px] text-slate-400 font-medium uppercase tracking-wider block">
+                      4-Digit Pairing Code (Zero IP Setup)
                     </span>
-                    <button
-                      onClick={handleRegenerateCode}
-                      className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                      title="Generate new pairing code"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center justify-center sm:justify-start gap-2 mt-1">
+                      <span className="text-3xl font-black font-mono tracking-widest text-cyan-400 bg-cyan-950/60 border-2 border-cyan-500/40 px-4 py-1.5 rounded-xl shadow-lg shadow-cyan-500/10">
+                        {deviceInfo?.shortCode || pairingCode.replace(/^SENT-/, '')}
+                      </span>
+                      <button
+                        onClick={handleRegenerateCode}
+                        className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                        title="Generate new pairing code"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    Open your phone's camera and point it at the QR code to open the <strong>web version</strong> in Chrome, Safari, or Edge without installing an app.
+                    Open <strong>PC Sentinel</strong> on your phone, tap <strong>Add PC to Fleet</strong>, and point your camera at this QR code or type <strong className="text-cyan-300 font-mono">{deviceInfo?.shortCode || pairingCode.replace(/^SENT-/, '')}</strong>.
                   </p>
+
+                  <div className="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/20 text-[11px] text-cyan-300 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 shrink-0 text-cyan-400" />
+                    <span>Zero IP address configuration needed. Both devices discover each other automatically over Wi-Fi.</span>
+                  </div>
 
                   <div className="flex items-center justify-center sm:justify-start gap-2 pt-1">
                     <a
                       href={pairingUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 cursor-pointer"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Open in Browser</span>
+                      <span>Open Web Companion</span>
                     </a>
                     <button
                       onClick={() => handleCopy(pairingUrl)}
