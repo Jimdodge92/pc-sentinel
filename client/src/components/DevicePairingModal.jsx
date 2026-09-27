@@ -99,7 +99,7 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
   };
 
   const pairingCode = deviceInfo?.deviceId || 'SENT-????';
-  const localIp = deviceInfo?.localIp || '192.168.4.39';
+  const localIp = deviceInfo?.localIp || (typeof window !== 'undefined' ? window.location.hostname : 'localhost');
   const port = deviceInfo?.port || 3500;
   const currentHost = window.location.origin;
 
@@ -219,7 +219,7 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
                   </div>
 
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    Scan with your phone or tablet camera to directly download <strong>pc-sentinel.apk</strong>. Once installed, the app runs locally on your device with <strong>zero server dependencies</strong>—it will always open even if the ThinkPad is completely dead.
+                    Scan with your phone or tablet camera to directly download <strong>pc-sentinel.apk</strong>. Once installed, the app runs locally on your device with <strong>zero server dependencies</strong>—it will always open even if your PC is completely dead.
                   </p>
 
                   <div className="flex items-center justify-center sm:justify-start gap-2 pt-1 flex-wrap">
@@ -387,10 +387,10 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
                   <span>Host Endpoint</span>
                 </div>
                 <span className="text-xs text-slate-300 font-mono block">
-                  {deviceInfo?.deviceName || 'ThinkPad'} ({localIp}:{port})
+                  {deviceInfo?.deviceName || 'Local PC'} ({localIp}:{port})
                 </span>
                 <span className="text-[11px] text-slate-400 block">
-                  Web companion requires the ThinkPad server to be running and reachable.
+                  Web companion requires the PC Sentinel server to be running and reachable.
                 </span>
               </div>
             </div>

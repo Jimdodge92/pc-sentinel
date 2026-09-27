@@ -9,10 +9,11 @@ import MemoryDetailsModal from './components/MemoryDetailsModal';
 import HostConfigModal from './components/HostConfigModal';
 import AddDeviceModal from './components/AddDeviceModal';
 import FleetManagerModal from './components/FleetManagerModal';
+import OnboardingPairing from './components/OnboardingPairing';
 import {
   Search, CheckCircle2, AlertCircle, AlertTriangle, Power, Lock,
   Smartphone, RefreshCw, Calendar, Trash2, Info,
-  Flame, ZapOff, Radio, RotateCw
+  Flame, ZapOff, Radio, RotateCw, QrCode
 } from 'lucide-react';
 
 // Dynamic Host API Base (supports Web browser, remote WAN, and Android APK native asset loading)
@@ -88,8 +89,24 @@ export default function App() {
     try {
       const saved = localStorage.getItem('sentinel_device_fleet');
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        let parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // SANITIZE: Filter out stale test records referencing ThinkPad or old test IPs
+          parsed = parsed.filter(d =>
+            d.name !== "Jim's ThinkPad" &&
+            !d.hostUrl?.includes('192.168.4.39') &&
+            !(isAndroidNative() && (d.id === 'local-host' || d.hostUrl?.includes('localhost')))
+          );
+          if (parsed.length > 0) return parsed;
+        }
+      }
+    } catch (e) {}
+
+    // Clean up any stale offline cache from legacy ThinkPad tests
+    try {
+      const cached = localStorage.getItem('sentinel_offline_cache');
+      if (cached && (cached.includes('ThinkPad') || cached.includes('192.168.4.39'))) {
+        localStorage.removeItem('sentinel_offline_cache');
       }
     } catch (e) {}
 
@@ -109,18 +126,22 @@ export default function App() {
       ];
     }
 
-    // In Android companion:
+    // In Android companion: starts completely clean with 0 devices!
     return [];
   });
   const [activeDeviceId, setActiveDeviceId] = useState(() => {
-    const savedId = localStorage.getItem('sentinel_active_device_id');
-    if (savedId) return savedId;
-    return !isAndroidNative() ? (localStorage.getItem('sentinel_device_id') || 'local-host') : '';
+    if (isAndroidNative()) {
+      const savedId = localStorage.getItem('sentinel_active_device_id');
+      if (savedId && savedId !== 'local-host' && savedId !== 'SENT-2541') return savedId;
+      return '';
+    }
+    return localStorage.getItem('sentinel_device_id') || 'local-host';
   });
   const [isAddDeviceModalOpen, setIsAddDeviceModalOpen] = useState(false);
   const [isFleetManagerModalOpen, setIsFleetManagerModalOpen] = useState(false);
 
   const activeDevice = useMemo(() => {
+    if (!fleet || fleet.length === 0) return null;
     return fleet.find(d => d.id === activeDeviceId) || fleet[0] || null;
   }, [fleet, activeDeviceId]);
 
@@ -129,6 +150,9 @@ export default function App() {
   const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
   const [isHostConfigModalOpen, setIsHostConfigModalOpen] = useState(false);
   const [currentHost, setCurrentHost] = useState(() => {
+    if (isAndroidNative()) {
+      return activeDevice?.hostUrl || '';
+    }
     return activeDevice?.hostUrl || getApiBase();
   });
 
@@ -197,8 +221,12 @@ export default function App() {
   };
 
   const fetchDeviceInfo = async (targetHost = currentHost) => {
+    if (isAndroidNative() && !activeDevice && !targetHost) {
+      return;
+    }
     try {
       const base = targetHost || getApiBase();
+      if (!base) return;
       const res = await universalFetch(`${base}/api/device/info`);
       if (res.ok) {
         const json = await res.json();
@@ -249,10 +277,21 @@ export default function App() {
   };
 
   const fetchDiagnostics = async (forceRefresh = false, activePin = userPin, overrideHost = null) => {
+    if (isAndroidNative() && !activeDevice && !overrideHost) {
+      setLoading(false);
+      setData(null);
+      setError(null);
+      setIsOffline(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
       const activeHost = overrideHost || activeDevice?.hostUrl || currentHost || getApiBase();
+      if (!activeHost) {
+        setLoading(false);
+        return;
+      }
       const url = `${activeHost}/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
       const headers = {};
       if (activePin) {
@@ -407,16 +446,23 @@ export default function App() {
     if (pairCode) {
       localStorage.setItem('sentinel_device_id', pairCode);
     }
-    fetchDeviceInfo();
+    if (!isAndroidNative() || activeDevice) {
+      fetchDeviceInfo();
+    }
   }, []);
 
   useEffect(() => {
-    fetchDiagnostics();
-  }, [daysFilter]);
+    if (!isAndroidNative() || activeDevice) {
+      fetchDiagnostics();
+    } else {
+      setLoading(false);
+    }
+  }, [daysFilter, activeDeviceId]);
 
   // Live Server-Sent Events (SSE) Stream for real-time heartbeat and shutdown interceptor
   useEffect(() => {
     if (pinRequired) return;
+    if (isAndroidNative() && !activeDevice) return;
 
     let eventSource = null;
     let pollTimer = null;
@@ -482,7 +528,7 @@ export default function App() {
                   localStorage.removeItem('sentinel_shutdown_intent');
                   setIsOffline(false);
                   setReconnectAttempt(0);
-                  setReconnectedToast('ThinkPad back online! Live telemetry refreshed.');
+                  setReconnectedToast(`${activeDevice?.name || 'PC'} back online! Live telemetry refreshed.`);
                   setTimeout(() => setReconnectedToast(null), 6000);
                   fetchDiagnostics(true);
                   connectSSE();
@@ -867,6 +913,12 @@ export default function App() {
               </button>
             </form>
           </div>
+        ) : isAndroidNative() && (!fleet || fleet.length === 0) ? (
+          /* Dedicated Onboarding / Zero-State Pairing Screen for Android companion app */
+          <OnboardingPairing
+            onDeviceAdded={handleDeviceAdded}
+            isNativeApp={isAndroidNative()}
+          />
         ) : (
           <>
             {/* Reconnected Toast Alert */}
@@ -901,11 +953,11 @@ export default function App() {
                             {shutdownIntent.title || 'Host Reboot in Progress: User-Initiated Restart'}
                           </h3>
                           <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono animate-pulse">
-                            Rebooting ThinkPad
+                            Rebooting {activeDevice?.name || 'PC'}
                           </span>
                         </div>
                         <p className="text-xs text-slate-300 leading-relaxed">
-                          {shutdownIntent.message || 'Your ThinkPad is currently restarting. Connection will restore momentarily as Windows finishes booting.'}
+                          {shutdownIntent.message || `Your ${activeDevice?.name || 'PC'} is currently restarting. Connection will restore momentarily as Windows finishes booting.`}
                         </p>
                         <div className="pt-2 flex items-center gap-3 text-xs text-cyan-300/90 font-mono flex-wrap">
                           <div className="flex items-center gap-1.5">
@@ -935,7 +987,7 @@ export default function App() {
                           </span>
                         </div>
                         <p className="text-xs text-rose-200/95 leading-relaxed">
-                          {shutdownIntent.message || 'An emergency thermal shutdown was triggered to protect processor silicon. The ThinkPad will stay powered off until temperatures normalize.'}
+                          {shutdownIntent.message || `An emergency thermal shutdown was triggered to protect processor silicon. The ${activeDevice?.name || 'system'} will stay powered off until temperatures normalize.`}
                         </p>
                         <p className="text-[11px] text-slate-400 font-mono mt-1">
                           Elevate laptop underside and ensure fan exhausts are unblocked before powering back on.
@@ -960,7 +1012,7 @@ export default function App() {
                           </span>
                         </div>
                         <p className="text-xs text-slate-300 leading-relaxed">
-                          {shutdownIntent.message || 'Your ThinkPad was cleanly shut down by the user. System will remain offline until manually powered on.'}
+                          {shutdownIntent.message || `Your ${activeDevice?.name || 'PC'} was cleanly shut down by the user. System will remain offline until manually powered on.`}
                         </p>
                         <div className="pt-2 flex items-center gap-2 text-xs text-purple-300/80 font-mono">
                           <span>Polling host for next power-on (Attempt #{reconnectAttempt})</span>
@@ -985,7 +1037,7 @@ export default function App() {
                           </span>
                         </div>
                         <p className="text-xs text-slate-300 leading-relaxed">
-                          Your ThinkPad severed communication abruptly with zero orderly shutdown intent received. Likely causes: Sudden power loss (unplugged or drained battery), instant kernel freeze (BSOD), or local Wi-Fi router drop.
+                          Your {activeDevice?.name || 'PC'} severed communication abruptly with zero orderly shutdown intent received. Likely causes: Sudden power loss (unplugged or drained battery), instant kernel freeze (BSOD), or local Wi-Fi router drop.
                         </p>
                         <div className="pt-2 flex items-center gap-3 text-xs text-amber-300/90 font-mono flex-wrap">
                           <div className="flex items-center gap-1.5">
@@ -1018,10 +1070,11 @@ export default function App() {
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
                   {isAndroidNative() && (
                     <button
-                      onClick={() => setIsHostConfigModalOpen(true)}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
+                      onClick={() => setIsAddDeviceModalOpen(true)}
+                      className="px-3 py-1.5 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 rounded-lg text-xs font-semibold border border-cyan-700/60 transition-colors cursor-pointer flex items-center gap-1.5"
                     >
-                      Change Host IP
+                      <QrCode className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Re-pair / Scan QR</span>
                     </button>
                   )}
                   <button

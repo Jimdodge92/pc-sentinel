@@ -49,8 +49,8 @@ export default function RemoteAccessModal({ onClose, networkInfo, onUpdateConfig
     }
   }, [networkInfo]);
 
-  const localIp = networkInfo?.localIp || '192.168.4.39';
-  const publicIp = networkInfo?.publicIp || '173.18.4.217';
+  const localIp = networkInfo?.localIp || (typeof window !== 'undefined' ? window.location.hostname : 'localhost');
+  const publicIp = networkInfo?.publicIp || localIp;
   const port = networkInfo?.port || 3500;
 
   const remoteUrl = `http://${publicIp}:${port}`;
@@ -166,7 +166,7 @@ export default function RemoteAccessModal({ onClose, networkInfo, onUpdateConfig
                   Cloud Vault Active
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">View diagnostic telemetry from your phone even if your ThinkPad powers down</p>
+              <p className="text-xs text-slate-400">View diagnostic telemetry from your phone even if your PC powers down</p>
             </div>
           </div>
           <button
@@ -252,7 +252,7 @@ export default function RemoteAccessModal({ onClose, networkInfo, onUpdateConfig
                     </span>
                   </h3>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    When your ThinkPad experiences an emergency thermal shutdown or power loss, the motherboard cuts power, making direct connections to the laptop impossible.
+                    When your PC experiences an emergency thermal shutdown or power loss, the motherboard cuts power, making direct connections to the machine impossible.
                     By linking a private GitHub Gist, PC Sentinel continuously pushes <strong>30-second heartbeats</strong> and an <strong>immediate emergency crash snapshot</strong> to the cloud before power drops.
                   </p>
                 </div>
@@ -459,8 +459,8 @@ export default function RemoteAccessModal({ onClose, networkInfo, onUpdateConfig
 
                   <p className="text-xs text-slate-400">
                     {qrType === 'cloud'
-                      ? 'Bookmark this on your phone: always accessible even when your ThinkPad is completely powered off or battery dead.'
-                      : 'Scan to connect directly to the live server running on your ThinkPad.'}
+                      ? 'Bookmark this on your phone: always accessible even when your PC is completely powered off or battery dead.'
+                      : 'Scan to connect directly to the live server running on your PC.'}
                   </p>
 
                   <div className="space-y-2 pt-1">
@@ -503,10 +503,10 @@ export default function RemoteAccessModal({ onClose, networkInfo, onUpdateConfig
                   <h3 className="font-bold text-white text-xs uppercase tracking-wider text-cyan-300">
                     Exact Router Configuration Values
                   </h3>
-                  <span className="text-[10px] text-slate-400 font-mono">Lenovo ThinkPad T15</span>
+                  <span className="text-[10px] text-slate-400 font-mono">{networkInfo?.deviceName || 'Windows PC'}</span>
                 </div>
                 <p className="text-xs text-slate-400">
-                  Log into your router's administration portal (usually <code className="text-cyan-300">192.168.1.1</code>, <code className="text-cyan-300">192.168.4.1</code>, or your router app like Eero/Google Home) and create this port forwarding rule:
+                  Log into your router's administration portal (usually your router app or default gateway) and create this port forwarding rule:
                 </p>
 
                 <div className="overflow-x-auto">

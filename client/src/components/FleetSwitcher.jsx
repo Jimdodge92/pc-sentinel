@@ -32,7 +32,7 @@ export default function FleetSwitcher({
     return 'bg-emerald-400';
   };
 
-  const displayName = activeDevice?.name || 'Jim\'s ThinkPad';
+  const displayName = activeDevice?.name || (fleet.length === 0 ? 'Pair a PC' : 'Select PC');
 
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>

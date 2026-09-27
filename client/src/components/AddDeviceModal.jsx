@@ -558,7 +558,7 @@ export default function AddDeviceModal({ isOpen, onClose, onDeviceAdded, existin
                       type="text"
                       value={manualHost}
                       onChange={(e) => setManualHost(e.target.value)}
-                      placeholder="e.g. 192.168.4.50:3500 or my-pc.local"
+                      placeholder="e.g. my-pc:3500"
                       className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:border-cyan-500 focus:outline-none"
                     />
                     <button

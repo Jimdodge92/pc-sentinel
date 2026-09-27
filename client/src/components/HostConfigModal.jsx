@@ -8,12 +8,12 @@ export default function HostConfigModal({ isOpen, onClose, onHostChanged }) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
-  const LAN_HOST = 'http://192.168.4.39:3500';
-  const WAN_HOST = 'http://173.18.4.217:3500';
+  const LAN_HOST = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:3500` : 'http://localhost:3500';
+  const WAN_HOST = LAN_HOST;
 
   useEffect(() => {
     if (isOpen) {
-      const active = getApiBase() || LAN_HOST;
+      const active = getApiBase() || '';
       setCurrentHost(active);
       setInputHost(active);
       setTestResult(null);
@@ -107,7 +107,7 @@ export default function HostConfigModal({ isOpen, onClose, onHostChanged }) {
     } else {
       setTestResult({
         success: false,
-        message: 'Could not automatically reach ThinkPad on LAN or WAN. Check Wi-Fi or enter IP manually.'
+        message: 'Could not automatically reach PC Sentinel on LAN or WAN. Check Wi-Fi or pair via QR code.'
       });
     }
   };
@@ -126,9 +126,9 @@ export default function HostConfigModal({ isOpen, onClose, onHostChanged }) {
             </div>
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                ThinkPad Connection Settings
+                PC Sentinel Connection Settings
               </h2>
-              <p className="text-[11px] text-slate-400">Configure PC Sentinel server host IP</p>
+              <p className="text-[11px] text-slate-400">Configure PC Sentinel server host endpoint</p>
             </div>
           </div>
           <button
@@ -210,7 +210,7 @@ export default function HostConfigModal({ isOpen, onClose, onHostChanged }) {
                 type="text"
                 value={inputHost}
                 onChange={(e) => setInputHost(e.target.value)}
-                placeholder="http://192.168.4.39:3500"
+                placeholder="http://my-pc:3500 or 192.168.x.x:3500"
                 className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 font-mono text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500"
               />
               <button

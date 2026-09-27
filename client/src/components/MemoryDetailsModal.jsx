@@ -111,7 +111,7 @@ export default function MemoryDetailsModal({ isOpen, onClose, systemSummary }) {
 
             <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
               <span>Free: <strong className="text-emerald-400 font-mono">{freeRamGB} GB</strong> available</span>
-              <span>Hardware Form Factor: <strong className="text-slate-300">{systemSummary?.FormFactor || 'ThinkPad Laptop'}</strong></span>
+              <span>Hardware Form Factor: <strong className="text-slate-300">{systemSummary?.FormFactor || 'Laptop / PC'}</strong></span>
             </div>
           </div>
 

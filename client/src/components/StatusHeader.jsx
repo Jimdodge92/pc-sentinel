@@ -117,7 +117,7 @@ export default function StatusHeader({
             <div className="hidden lg:flex items-center gap-3 text-xs text-slate-300 bg-slate-900/80 px-3.5 py-2 rounded-lg border border-slate-800">
               <div className="flex items-center gap-1.5 text-cyan-300 font-semibold" title={`${systemSummary.Manufacturer || ''} ${systemSummary.Model || ''}`}>
                 <Laptop className="w-3.5 h-3.5 text-cyan-400" />
-                <span>{systemSummary.SystemFamily || systemSummary.Model || 'ThinkPad'}</span>
+                <span>{systemSummary.SystemFamily || systemSummary.Model || 'Windows PC'}</span>
               </div>
               <div className="w-px h-3 bg-slate-700" />
               <div className="flex items-center gap-1.5" title={systemSummary.Processor}>
@@ -132,17 +132,15 @@ export default function StatusHeader({
             </div>
           )}
 
-          {/* If native Android app, show Host Connection config button */}
+          {/* If native Android app, show Pair PC button instead of IP address */}
           {isNativeApp ? (
             <button
-              onClick={onOpenHostConfig}
-              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg font-medium text-xs tracking-wide bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border border-cyan-500/40 transition-all active:scale-95 shadow-sm cursor-pointer"
-              title="Configure ThinkPad Server Host IP"
+              onClick={onOpenAddDevice}
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg font-medium text-xs tracking-wide bg-gradient-to-r from-cyan-950/80 to-blue-950/80 hover:from-cyan-900/80 hover:to-blue-900/80 text-cyan-300 border border-cyan-500/40 transition-all active:scale-95 shadow-sm cursor-pointer"
+              title="Pair another PC to fleet"
             >
-              <Server className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="font-mono truncate max-w-[130px]">
-                {currentHost ? currentHost.replace('http://', '') : '192.168.4.39'}
-              </span>
+              <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
+              <span>+ Pair PC</span>
             </button>
           ) : (
             <button

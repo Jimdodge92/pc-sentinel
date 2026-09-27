@@ -257,6 +257,30 @@ class MainActivity : ComponentActivity() {
                 errJson.toString()
             }
         }
+
+        @JavascriptInterface
+        fun getDeviceWifiIp(): String {
+            return try {
+                val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+                while (interfaces.hasMoreElements()) {
+                    val iface = interfaces.nextElement()
+                    if (iface.isLoopback || !iface.isUp) continue
+                    val addresses = iface.inetAddresses
+                    while (addresses.hasMoreElements()) {
+                        val addr = addresses.nextElement()
+                        if (!addr.isLoopbackAddress && addr is java.net.Inet4Address) {
+                            val ip = addr.hostAddress ?: ""
+                            if (!ip.startsWith("127.") && !ip.startsWith("169.254")) {
+                                return ip
+                            }
+                        }
+                    }
+                }
+                ""
+            } catch (e: Exception) {
+                ""
+            }
+        }
     }
 
     override fun onBackPressed() {
