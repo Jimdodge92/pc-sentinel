@@ -56,10 +56,10 @@ Name: "{group}\Uninstall PC Sentinel"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\PC Sentinel Dashboard"; Filename: "http://localhost:3500"; IconFilename: "{app}\installer\app_icon.ico"; Tasks: desktopicon
 
 [Run]
-; 1. Enable Windows Firewall for port 3500
-Filename: "{cmd}"; Parameters: "/c ""{app}\enable-firewall.bat"""; Flags: runhidden waituntilterminated
+; 1. Enable Windows Firewall for port 3500 directly via netsh (eliminates hidden console wait)
+Filename: "netsh.exe"; Parameters: "advfirewall firewall add rule name=""PC Sentinel Remote Access"" dir=in action=allow protocol=TCP localport=3500"; Flags: runhidden
 ; 2. Register PCSentinelService and PCSentinelShutdownTrigger as Windows System Services
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\setup-system-service.ps1"""; Flags: runhidden waituntilterminated
+Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\setup-system-service.ps1"""; Flags: runhidden waituntilterminated
 ; 3. Launch the dashboard in browser on completion
 Filename: "http://localhost:3500"; Description: "Launch PC Sentinel Dashboard"; Flags: postinstall shellexec nowait
 
