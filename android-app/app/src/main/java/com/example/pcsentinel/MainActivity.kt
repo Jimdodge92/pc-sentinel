@@ -20,11 +20,14 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebViewAssetLoader
 
 class MainActivity : ComponentActivity() {
@@ -44,9 +47,14 @@ class MainActivity : ComponentActivity() {
         createNotificationChannel()
         checkNotificationPermission()
 
+        window.statusBarColor = Color.parseColor("#090d16")
+        window.navigationBarColor = Color.parseColor("#090d16")
+
         WebView.setWebContentsDebuggingEnabled(true)
 
         val assetLoader = WebViewAssetLoader.Builder()
+            .setDomain("appassets.androidplatform.net")
+            .setHttpAllowed(true)
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
 
@@ -64,6 +72,7 @@ class MainActivity : ComponentActivity() {
                 useWideViewPort = true
                 loadWithOverviewMode = true
                 cacheMode = WebSettings.LOAD_DEFAULT
+                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 userAgentString = "$userAgentString PCSentinelAndroidApp/1.0"
             }
 
@@ -94,10 +103,25 @@ class MainActivity : ComponentActivity() {
             }
 
             addJavascriptInterface(AndroidBridge(this@MainActivity), "AndroidBridge")
-            loadUrl("https://appassets.androidplatform.net/assets/web/index.html")
+            loadUrl("http://appassets.androidplatform.net/assets/web/index.html")
         }
 
-        setContentView(webView)
+        // Wrap in a FrameLayout with WindowInsets to avoid overlapping the camera cutout and navigation bar
+        val rootLayout = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#090d16"))
+            addView(webView, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
+
+        setContentView(rootLayout)
     }
 
     private fun checkNotificationPermission() {

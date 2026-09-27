@@ -17,7 +17,13 @@ const {
 const app = express();
 const PORT = process.env.PORT || 3500;
 
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-sentinel-pin', 'Cache-Control', 'Accept'],
+  exposedHeaders: ['Content-Type', 'Content-Disposition']
+}));
+app.options('*', cors());
 app.use(express.json());
 
 // Configuration path & helpers
@@ -231,6 +237,8 @@ app.get('/api/stream', requirePinIfRemote, (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
     'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-sentinel-pin',
     'X-Accel-Buffering': 'no'
   });
 

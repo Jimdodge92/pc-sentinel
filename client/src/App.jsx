@@ -6,6 +6,7 @@ import DiagnosisModal from './components/DiagnosisModal';
 import HardwareStatusCard from './components/HardwareStatusCard';
 import DevicePairingModal from './components/DevicePairingModal';
 import MemoryDetailsModal from './components/MemoryDetailsModal';
+import HostConfigModal from './components/HostConfigModal';
 import {
   Search, CheckCircle2, AlertCircle, AlertTriangle, Power, Lock,
   Smartphone, RefreshCw, Calendar, Trash2, Info,
@@ -28,7 +29,8 @@ export const getApiBase = () => {
     const stored = localStorage.getItem('sentinel_host_url');
     if (stored) return stored.replace(/\/+$/, '');
     if (isAndroidNative()) {
-      return 'http://173.18.4.217:3500';
+      // Default to Local Wi-Fi (192.168.4.39:3500)
+      return 'http://192.168.4.39:3500';
     }
   }
   return '';
@@ -43,9 +45,11 @@ export default function App() {
   // Top Memory Processes Modal State
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState(false);
 
-  // Device Pairing & Modal State
+  // Device Pairing & Host Config State
   const [deviceInfo, setDeviceInfo] = useState(null);
   const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
+  const [isHostConfigModalOpen, setIsHostConfigModalOpen] = useState(false);
+  const [currentHost, setCurrentHost] = useState(() => getApiBase());
 
   // Cloud & Offline Detection State
   const [isOffline, setIsOffline] = useState(false);
@@ -664,10 +668,13 @@ export default function App() {
         isOffline={isOffline}
         onJumpToIncident={jumpToLatestIncident}
         onResetHome={handleResetHome}
+        isNativeApp={isAndroidNative()}
+        onOpenHostConfig={() => setIsHostConfigModalOpen(true)}
+        currentHost={currentHost}
       />
 
       {/* 2. Main Content Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 w-full mt-6 space-y-6 flex-1">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 w-full mt-3 sm:mt-6 space-y-4 sm:space-y-6 flex-1">
         {/* PIN Authentication Required Screen */}
         {pinRequired ? (
           <div className="max-w-md mx-auto my-12 bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6 text-center">
@@ -843,18 +850,33 @@ export default function App() {
 
             {/* Error Alert */}
             {error && (
-              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-center gap-3 text-rose-300 text-sm">
-                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-                <div className="flex-1">
-                  <strong>Connection Issue: </strong>
-                  <span>{error}</span>
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-rose-300 text-xs sm:text-sm">
+                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                  <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                  <div>
+                    <strong>Connection Issue: </strong>
+                    <span>{error}</span>
+                    <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                      Target Server: {getApiBase() || 'Not set'}
+                    </div>
+                  </div>
                 </div>
-                <button
-                  onClick={() => fetchDiagnostics(true)}
-                  className="px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 rounded text-xs font-semibold text-rose-200 border border-rose-500/40"
-                >
-                  Retry
-                </button>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+                  {isAndroidNative() && (
+                    <button
+                      onClick={() => setIsHostConfigModalOpen(true)}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
+                    >
+                      Change Host IP
+                    </button>
+                  )}
+                  <button
+                    onClick={() => fetchDiagnostics(true)}
+                    className="px-3.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 rounded-lg text-xs font-semibold text-rose-200 border border-rose-500/40 transition-colors cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1234,6 +1256,16 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* 8. ThinkPad Server Host Configuration Modal */}
+      <HostConfigModal
+        isOpen={isHostConfigModalOpen}
+        onClose={() => setIsHostConfigModalOpen(false)}
+        onHostChanged={(newHost) => {
+          setCurrentHost(newHost);
+          fetchDiagnostics(true);
+        }}
+      />
     </div>
   );
 }
