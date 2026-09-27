@@ -335,7 +335,7 @@ export default function App() {
       }
 
       let res;
-      const lanTimeoutMs = (activeDevice?.isCloudRelayed) ? 2500 : 25000;
+      const lanTimeoutMs = isAndroidNative() ? 2500 : ((activeDevice?.isCloudRelayed) ? 2500 : 15000);
       try {
         res = await universalFetch(url, { headers, signal: AbortSignal.timeout(lanTimeoutMs) });
       } catch (networkErr) {
@@ -347,7 +347,7 @@ export default function App() {
           if (fallbackHost && fallbackHost !== activeHost) {
             try {
               const lanUrl = `${fallbackHost}/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
-              const lanRes = await universalFetch(lanUrl, { headers, signal: AbortSignal.timeout(2500) });
+              const lanRes = await universalFetch(lanUrl, { headers, signal: AbortSignal.timeout(2000) });
               if (lanRes.ok || lanRes.status === 401) {
                 res = lanRes;
               }
@@ -360,7 +360,7 @@ export default function App() {
           if (!res && activeDevice?.wanUrl && activeDevice.wanUrl !== activeHost) {
             try {
               const wanUrl = `${activeDevice.wanUrl}/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
-              const wanRes = await universalFetch(wanUrl, { headers, signal: AbortSignal.timeout(3000) });
+              const wanRes = await universalFetch(wanUrl, { headers, signal: AbortSignal.timeout(2500) });
               if (wanRes.ok || wanRes.status === 401) {
                 res = wanRes;
               }
@@ -375,7 +375,7 @@ export default function App() {
             for (const server of RELAY_SERVERS) {
               try {
                 const ntfyRes = await universalFetch(`${server}/${relayTopic}/json?poll=1`, {
-                  signal: AbortSignal.timeout(4500)
+                  signal: AbortSignal.timeout(4000)
                 });
                 if (ntfyRes.ok) {
                   const text = await ntfyRes.text();
@@ -384,17 +384,18 @@ export default function App() {
                     try {
                       const lastMsg = JSON.parse(lines[i]);
                       let telemetry = null;
-                      if (lastMsg.attachment?.url) {
+                      if (lastMsg.message) {
+                        try {
+                          telemetry = JSON.parse(lastMsg.message);
+                        } catch (e) {}
+                      }
+                      if (!telemetry && lastMsg.attachment?.url) {
                         const attachRes = await universalFetch(lastMsg.attachment.url, {
-                          signal: AbortSignal.timeout(6000)
+                          signal: AbortSignal.timeout(4000)
                         });
                         if (attachRes.ok) {
                           telemetry = await attachRes.json();
                         }
-                      } else if (lastMsg.message) {
-                        try {
-                          telemetry = JSON.parse(lastMsg.message);
-                        } catch (e) {}
                       }
 
                       if (telemetry && (telemetry.deviceId || telemetry.overallHealth)) {
@@ -591,27 +592,31 @@ export default function App() {
     let eventSource = null;
     let reconnectTimeout = null;
     let isConnecting = false;
+    let activeEndpointIndex = 0;
+
+    const base = activeDevice?.hostUrl || getApiBase();
+    const relayTopic = activeDevice?.relayTopic || (activeDevice?.id && activeDevice.id !== 'local-host' ? `pcsentinel-telemetry-${activeDevice.id}` : null);
+    const pinParam = userPin ? `?pin=${encodeURIComponent(userPin)}` : '';
+
+    const streamEndpoints = [];
+    if (base && !base.includes('appassets.androidplatform.net')) {
+      streamEndpoints.push(`${base}/api/stream${pinParam}`);
+    }
+    if (relayTopic) {
+      streamEndpoints.push(`https://ntfy.adminforge.de/${relayTopic}/sse`);
+      streamEndpoints.push(`https://ntfy.tedomum.fr/${relayTopic}/sse`);
+    }
+
+    if (streamEndpoints.length === 0) return;
 
     const connectSSE = () => {
       if (isConnecting) return;
       isConnecting = true;
 
-      const base = activeDevice?.hostUrl || getApiBase();
-      const relayTopic = activeDevice?.relayTopic || (activeDevice?.id && activeDevice.id !== 'local-host' ? `pcsentinel-telemetry-${activeDevice.id}` : null);
-      const pinParam = userPin ? `?pin=${encodeURIComponent(userPin)}` : '';
-      
-      // Determine stream endpoint: direct local SSE first, or Cloud Relay SSE over cellular
-      let sseUrl = (base && !base.includes('appassets.androidplatform.net')) 
-        ? `${base}/api/stream${pinParam}` 
-        : (relayTopic ? `https://ntfy.adminforge.de/${relayTopic}/sse` : null);
-
-      if (!sseUrl) {
-        isConnecting = false;
-        return;
-      }
+      const targetEndpoint = streamEndpoints[activeEndpointIndex % streamEndpoints.length];
 
       try {
-        eventSource = new EventSource(sseUrl);
+        eventSource = new EventSource(targetEndpoint);
 
         eventSource.addEventListener('open', () => {
           isConnecting = false;
@@ -630,7 +635,7 @@ export default function App() {
           setReconnectAttempt(0);
         });
 
-        // Universal Cloud Relay SSE payload receiver
+        // Universal Cloud Relay & Local SSE payload receiver
         eventSource.addEventListener('message', (e) => {
           try {
             const data = JSON.parse(e.data);
@@ -639,8 +644,24 @@ export default function App() {
               setShutdownIntent(intent);
               localStorage.setItem('sentinel_shutdown_intent', JSON.stringify(intent));
               setIsOffline(true);
-            } else if (data.attachment?.url || data.event === 'message') {
-              // Fresh diagnostic telemetry published to cloud
+            } else if (data.message) {
+              // Direct compact telemetry payload pushed from PC Sentinel
+              try {
+                const parsed = JSON.parse(data.message);
+                if (parsed.type === 'telemetry_snapshot' || parsed.deviceId) {
+                  setData(prev => ({
+                    ...prev,
+                    ...parsed,
+                    incidents: (parsed.incidents && parsed.incidents.length > 0) ? parsed.incidents : (prev?.incidents || [])
+                  }));
+                  setIsOffline(false);
+                  setOfflineInfo(null);
+                  setShutdownIntent(null);
+                  return;
+                }
+              } catch (pErr) {}
+              fetchDiagnostics(false);
+            } else if (data.attachment?.url) {
               fetchDiagnostics(false);
             }
           } catch (err) {}
@@ -655,7 +676,7 @@ export default function App() {
             setIsOffline(true);
 
             // Trigger native Android notification if running in mobile companion APK
-            if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.showNotification) {
+            if (typeof window !== 'undefined' && window.AndroidBridge?.showNotification) {
               window.AndroidBridge.showNotification(
                 intent.title || 'PC Sentinel Alert',
                 intent.message || 'Host is shutting down or restarting',
@@ -672,25 +693,15 @@ export default function App() {
             eventSource = null;
           }
 
-          // A mobile network drop or Wi-Fi to cellular transition is normal;
-          // NEVER mark the host as crashed on a client-side socket error!
-          if (relayTopic && !sseUrl.includes('ntfy.adminforge.de')) {
-            // Local LAN stream unreachable; seamlessly switch to Cloud Relay SSE
-            sseUrl = `https://ntfy.adminforge.de/${relayTopic}/sse`;
-            reconnectTimeout = setTimeout(connectSSE, 2000);
-            return;
-          } else if (relayTopic && sseUrl.includes('ntfy.adminforge.de')) {
-            // Switch to secondary relay
-            sseUrl = `https://ntfy.tedomum.fr/${relayTopic}/sse`;
-            reconnectTimeout = setTimeout(connectSSE, 2000);
-            return;
-          }
-
-          // Reconnect gracefully
-          reconnectTimeout = setTimeout(connectSSE, 8000);
+          // Cycle to next endpoint (e.g. if local LAN fails on cellular 5G, immediately switch to cloud relay)
+          activeEndpointIndex = (activeEndpointIndex + 1) % streamEndpoints.length;
+          const delay = (activeEndpointIndex === 0) ? 5000 : 1500;
+          reconnectTimeout = setTimeout(connectSSE, delay);
         };
       } catch (err) {
         isConnecting = false;
+        activeEndpointIndex = (activeEndpointIndex + 1) % streamEndpoints.length;
+        reconnectTimeout = setTimeout(connectSSE, 2500);
       }
     };
 

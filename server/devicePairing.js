@@ -221,17 +221,21 @@ async function announcePairingRendezvous(customStatus = 'healthy') {
 
     for (const server of RELAY_SERVERS) {
       try {
-        const req = https.request(`${server}/pcsentinel-pair-${code}`, {
+        const ntfyPairPayload = JSON.stringify({
+          topic: `pcsentinel-pair-${code}`,
+          message: postData,
+          title: `PC Sentinel - ${record.deviceName}`
+        });
+        const req = https.request(`${server}`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Title': `PC Sentinel - ${record.deviceName}`
+            'Content-Type': 'application/json'
           },
           timeout: 4000
         }, (res) => res.resume());
         req.on('error', () => {});
         req.on('timeout', () => req.destroy());
-        req.write(postData);
+        req.write(ntfyPairPayload);
         req.end();
       } catch (e) {}
     }
@@ -284,19 +288,24 @@ async function publishToCloudRelay(telemetryData) {
     if (aliasId) deviceIdsToPublish.push(aliasId);
 
     for (const devId of deviceIdsToPublish) {
+      const ntfyTelemetryPayload = JSON.stringify({
+        topic: `pcsentinel-telemetry-${devId}`,
+        message: telemetryPayload,
+        title: `${pairingRecord ? pairingRecord.deviceName : 'PC Sentinel'} Live Telemetry`
+      });
+
       for (const server of RELAY_SERVERS) {
         try {
-          const req = https.request(`${server}/pcsentinel-telemetry-${devId}`, {
+          const req = https.request(`${server}`, {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
-              'Title': `${pairingRecord ? pairingRecord.deviceName : 'PC Sentinel'} Live Telemetry`
+              'Content-Type': 'application/json'
             },
             timeout: 4000
           }, (res) => res.resume());
           req.on('error', () => {});
           req.on('timeout', () => req.destroy());
-          req.write(telemetryPayload);
+          req.write(ntfyTelemetryPayload);
           req.end();
         } catch (e) {}
       }
@@ -324,13 +333,6 @@ async function publishShutdownAlert(intent) {
     timestamp: new Date().toISOString()
   });
 
-  const headers = {
-    'Content-Type': 'application/json',
-    'Title': intent?.title || 'PC Sentinel Shutdown Alert',
-    'Priority': 'urgent',
-    'Tags': 'warning,skull'
-  };
-
   const topics = [
     `pcsentinel-telemetry-${cfg.deviceId}`,
     `pcsentinel-pair-${shortCode}`
@@ -344,10 +346,21 @@ async function publishShutdownAlert(intent) {
   for (const server of RELAY_SERVERS) {
     for (const topic of topics) {
       try {
-        const req = https.request(`${server}/${topic}`, { method: 'POST', headers, timeout: 3000 }, (res) => res.resume());
+        const ntfyAlert = JSON.stringify({
+          topic,
+          message: payload,
+          title: intent?.title || 'PC Sentinel Shutdown Alert',
+          priority: 5,
+          tags: ['warning', 'skull']
+        });
+        const req = https.request(`${server}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 3000
+        }, (res) => res.resume());
         req.on('error', () => {});
         req.on('timeout', () => req.destroy());
-        req.write(payload);
+        req.write(ntfyAlert);
         req.end();
       } catch (e) {}
     }
