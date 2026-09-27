@@ -328,26 +328,28 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
         if (relayRes.ok) {
           const text = await relayRes.text();
           const lines = text.trim().split('\n').filter(Boolean);
-          if (lines.length > 0) {
-            const lastMsg = JSON.parse(lines[lines.length - 1]);
-            if (lastMsg.message) {
-              const record = JSON.parse(lastMsg.message);
-              if (record.deviceId) {
-                completePairing({
-                  id: record.deviceId,
-                  name: record.deviceName || 'PC Sentinel Machine',
-                  hostUrl: record.lanUrl || '',
-                  lanIps: record.lanIps || [],
-                  relayTopic: record.relayTopic || `pcsentinel-telemetry-${record.deviceId}`,
-                  isCloudRelayed: true,
-                  status: record.status || 'healthy',
-                  isDefault: true,
-                  isOffline: false,
-                  lastSeen: record.lastSeen || new Date().toISOString()
-                });
-                return;
+          for (let i = lines.length - 1; i >= 0; i--) {
+            try {
+              const lastMsg = JSON.parse(lines[i]);
+              if (lastMsg.message) {
+                const record = JSON.parse(lastMsg.message);
+                if (record.deviceId) {
+                  completePairing({
+                    id: record.deviceId,
+                    name: record.deviceName || 'PC Sentinel Machine',
+                    hostUrl: record.lanUrl || '',
+                    lanIps: record.lanIps || [],
+                    relayTopic: record.relayTopic || `pcsentinel-telemetry-${record.deviceId}`,
+                    isCloudRelayed: true,
+                    status: record.status || 'healthy',
+                    isDefault: true,
+                    isOffline: false,
+                    lastSeen: record.lastSeen || new Date().toISOString()
+                  });
+                  return;
+                }
               }
-            }
+            } catch (lineErr) {}
           }
         }
       } catch (cloudErr) {

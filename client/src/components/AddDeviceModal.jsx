@@ -252,25 +252,27 @@ export default function AddDeviceModal({ isOpen, onClose, onDeviceAdded, existin
         if (relayRes.ok) {
           const text = await relayRes.text();
           const lines = text.trim().split('\n').filter(Boolean);
-          if (lines.length > 0) {
-            const lastMsg = JSON.parse(lines[lines.length - 1]);
-            if (lastMsg.message) {
-              const record = JSON.parse(lastMsg.message);
-              if (record.deviceId) {
-                addDeviceToFleet({
-                  id: record.deviceId,
-                  name: record.deviceName || 'PC Sentinel Machine',
-                  hostUrl: record.lanUrl || '',
-                  lanIps: record.lanIps || [],
-                  relayTopic: record.relayTopic || `pcsentinel-telemetry-${record.deviceId}`,
-                  isCloudRelayed: true,
-                  status: record.status || 'healthy',
-                  isOffline: false,
-                  lastSeen: record.lastSeen || new Date().toISOString()
-                });
-                return;
+          for (let i = lines.length - 1; i >= 0; i--) {
+            try {
+              const lastMsg = JSON.parse(lines[i]);
+              if (lastMsg.message) {
+                const record = JSON.parse(lastMsg.message);
+                if (record.deviceId) {
+                  addDeviceToFleet({
+                    id: record.deviceId,
+                    name: record.deviceName || 'PC Sentinel Machine',
+                    hostUrl: record.lanUrl || '',
+                    lanIps: record.lanIps || [],
+                    relayTopic: record.relayTopic || `pcsentinel-telemetry-${record.deviceId}`,
+                    isCloudRelayed: true,
+                    status: record.status || 'healthy',
+                    isOffline: false,
+                    lastSeen: record.lastSeen || new Date().toISOString()
+                  });
+                  return;
+                }
               }
-            }
+            } catch (e) {}
           }
         }
       } catch (cloudErr) {
@@ -644,8 +646,9 @@ export default function AddDeviceModal({ isOpen, onClose, onDeviceAdded, existin
 
         {/* Footer */}
         <div className="px-6 py-3.5 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between">
-          <span className="text-[10px] text-slate-500">
-            Both devices must be on the same Wi-Fi / Local Network
+          <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            Works on local Wi-Fi, mobile hotspot, or remote networks via Cloud Relay
           </span>
           <button
             type="button"

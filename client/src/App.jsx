@@ -361,42 +361,44 @@ export default function App() {
               if (ntfyRes.ok) {
                 const text = await ntfyRes.text();
                 const lines = text.trim().split('\n').filter(Boolean);
-                if (lines.length > 0) {
-                  const lastMsg = JSON.parse(lines[lines.length - 1]);
-                  let telemetry = null;
-                  if (lastMsg.attachment?.url) {
-                    const attachRes = await universalFetch(lastMsg.attachment.url, {
-                      signal: AbortSignal.timeout(8000)
-                    });
-                    if (attachRes.ok) {
-                      telemetry = await attachRes.json();
-                    }
-                  } else if (lastMsg.message) {
-                    try {
-                      telemetry = JSON.parse(lastMsg.message);
-                    } catch (e) {}
-                  }
-
-                  if (telemetry) {
-                    localStorage.setItem(`sentinel_cache_${activeDevice.id}`, JSON.stringify(telemetry));
-                    localStorage.setItem('sentinel_offline_cache', JSON.stringify(telemetry));
-                    const hbTime = telemetry.scanTime;
-                    const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
-                    if (ageMins > 5) {
-                      setIsOffline(true);
-                      setOfflineInfo({
-                        lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Prior to shutdown',
-                        ageMins
+                for (let i = lines.length - 1; i >= 0; i--) {
+                  try {
+                    const lastMsg = JSON.parse(lines[i]);
+                    let telemetry = null;
+                    if (lastMsg.attachment?.url) {
+                      const attachRes = await universalFetch(lastMsg.attachment.url, {
+                        signal: AbortSignal.timeout(8000)
                       });
-                    } else {
-                      setIsOffline(false);
-                      setOfflineInfo(null);
+                      if (attachRes.ok) {
+                        telemetry = await attachRes.json();
+                      }
+                    } else if (lastMsg.message) {
+                      try {
+                        telemetry = JSON.parse(lastMsg.message);
+                      } catch (e) {}
                     }
-                    setData(telemetry);
-                    setPinRequired(false);
-                    setLoading(false);
-                    return;
-                  }
+
+                    if (telemetry) {
+                      localStorage.setItem(`sentinel_cache_${activeDevice.id}`, JSON.stringify(telemetry));
+                      localStorage.setItem('sentinel_offline_cache', JSON.stringify(telemetry));
+                      const hbTime = telemetry.scanTime;
+                      const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
+                      if (ageMins > 5) {
+                        setIsOffline(true);
+                        setOfflineInfo({
+                          lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Prior to shutdown',
+                          ageMins
+                        });
+                      } else {
+                        setIsOffline(false);
+                        setOfflineInfo(null);
+                      }
+                      setData(telemetry);
+                      setPinRequired(false);
+                      setLoading(false);
+                      return;
+                    }
+                  } catch (lineErr) {}
                 }
               }
             } catch (relayErr) {
