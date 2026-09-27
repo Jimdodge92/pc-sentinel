@@ -754,6 +754,19 @@ app.get(['/download/pc-sentinel.apk', '/downloads/pc-sentinel.apk', '/api/downlo
 });
 
 /**
+ * Direct Windows Installer Download Route
+ */
+app.get(['/download/PC-Sentinel-Setup.exe', '/downloads/PC-Sentinel-Setup.exe', '/api/download/installer'], (req, res) => {
+  const exePath = path.join(__dirname, 'public/PC-Sentinel-Setup.exe');
+  if (fs.existsSync(exePath)) {
+    res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
+    res.setHeader('Content-Disposition', 'attachment; filename="PC-Sentinel-Setup.exe"');
+    return res.sendFile(exePath);
+  }
+  res.status(404).send('PC Sentinel Windows Installer is currently being compiled. Please try again shortly.');
+});
+
+/**
  * Device Pairing & Identity info
  */
 app.get('/api/device/info', (req, res) => {
@@ -764,6 +777,9 @@ app.get('/api/device/info', (req, res) => {
   const apkPath = path.join(__dirname, 'public/pc-sentinel.apk');
   const apkExists = fs.existsSync(apkPath);
   const apkSizeMB = apkExists ? (fs.statSync(apkPath).size / (1024 * 1024)).toFixed(1) : null;
+  const exePath = path.join(__dirname, 'public/PC-Sentinel-Setup.exe');
+  const exeExists = fs.existsSync(exePath);
+  const exeSizeMB = exeExists ? (fs.statSync(exePath).size / (1024 * 1024)).toFixed(1) : null;
 
   res.json({
     ...device,
@@ -772,7 +788,10 @@ app.get('/api/device/info', (req, res) => {
     pairingUrl: `${protocol}://${reqHost}?pair=${device.deviceId}`,
     apkDownloadUrl: `${protocol}://${reqHost}/download/pc-sentinel.apk`,
     apkExists,
-    apkSizeMB
+    apkSizeMB,
+    installerDownloadUrl: `${protocol}://${reqHost}/download/PC-Sentinel-Setup.exe`,
+    installerExists: exeExists,
+    installerSizeMB: exeSizeMB
   });
 });
 

@@ -7,6 +7,8 @@ import HardwareStatusCard from './components/HardwareStatusCard';
 import DevicePairingModal from './components/DevicePairingModal';
 import MemoryDetailsModal from './components/MemoryDetailsModal';
 import HostConfigModal from './components/HostConfigModal';
+import AddDeviceModal from './components/AddDeviceModal';
+import FleetManagerModal from './components/FleetManagerModal';
 import {
   Search, CheckCircle2, AlertCircle, AlertTriangle, Power, Lock,
   Smartphone, RefreshCw, Calendar, Trash2, Info,
@@ -72,11 +74,43 @@ export default function App() {
   // Top Memory Processes Modal State
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState(false);
 
+  // Multi-PC Fleet Monitoring State
+  const [fleet, setFleet] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sentinel_device_fleet');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    const defaultHost = getApiBase() || 'http://192.168.4.39:3500';
+    return [
+      {
+        id: localStorage.getItem('sentinel_device_id') || 'SENT-2541',
+        name: "Jim's ThinkPad",
+        hostUrl: defaultHost,
+        lanIps: [defaultHost],
+        wanUrl: 'http://173.18.4.217:3500',
+        status: 'healthy',
+        isDefault: true,
+        lastSeen: new Date().toISOString()
+      }
+    ];
+  });
+  const [activeDeviceId, setActiveDeviceId] = useState(() => {
+    return localStorage.getItem('sentinel_active_device_id') || 'SENT-2541';
+  });
+  const [isAddDeviceModalOpen, setIsAddDeviceModalOpen] = useState(false);
+  const [isFleetManagerModalOpen, setIsFleetManagerModalOpen] = useState(false);
+
+  const activeDevice = useMemo(() => {
+    return fleet.find(d => d.id === activeDeviceId) || fleet[0] || null;
+  }, [fleet, activeDeviceId]);
+
   // Device Pairing & Host Config State
   const [deviceInfo, setDeviceInfo] = useState(null);
   const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
   const [isHostConfigModalOpen, setIsHostConfigModalOpen] = useState(false);
-  const [currentHost, setCurrentHost] = useState(() => getApiBase());
+  const [currentHost, setCurrentHost] = useState(() => {
+    return activeDevice?.hostUrl || getApiBase();
+  });
 
   // Cloud & Offline Detection State
   const [isOffline, setIsOffline] = useState(false);
@@ -111,9 +145,41 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [daysFilter, setDaysFilter] = useState(14);
 
-  const fetchDeviceInfo = async () => {
+  const handleSelectDevice = async (device) => {
+    setActiveDeviceId(device.id);
+    localStorage.setItem('sentinel_active_device_id', device.id);
+    if (device.hostUrl) {
+      localStorage.setItem('sentinel_host_url', device.hostUrl);
+      setCurrentHost(device.hostUrl);
+    }
+
+    // Load isolated device cache if available
+    const devCache = localStorage.getItem(`sentinel_cache_${device.id}`);
+    if (devCache) {
+      try {
+        setData(JSON.parse(devCache));
+      } catch (e) {}
+    }
+
+    fetchDiagnostics(false, userPin, device.hostUrl);
+  };
+
+  const handleDeviceAdded = (newDevice) => {
+    const updated = [...fleet.filter(d => d.id !== newDevice.id), newDevice];
+    setFleet(updated);
+    localStorage.setItem('sentinel_device_fleet', JSON.stringify(updated));
+    handleSelectDevice(newDevice);
+  };
+
+  const handleUpdateFleet = (updatedFleet) => {
+    setFleet(updatedFleet);
+    localStorage.setItem('sentinel_device_fleet', JSON.stringify(updatedFleet));
+  };
+
+  const fetchDeviceInfo = async (targetHost = currentHost) => {
     try {
-      const res = await universalFetch(`${getApiBase()}/api/device/info`);
+      const base = targetHost || getApiBase();
+      const res = await universalFetch(`${base}/api/device/info`);
       if (res.ok) {
         const json = await res.json();
         setDeviceInfo(json);
@@ -123,17 +189,32 @@ export default function App() {
         if (json.firebaseConfig?.projectId) {
           localStorage.setItem('sentinel_firebase_project', json.firebaseConfig.projectId);
         }
+
+        // Keep fleet entry synced with real hardware hostname
+        setFleet(prev => prev.map(d => {
+          if (d.id === json.deviceId || d.id === activeDeviceId) {
+            return {
+              ...d,
+              id: json.deviceId || d.id,
+              name: json.deviceName || d.name,
+              lanIps: json.localIp ? [json.localIp] : d.lanIps,
+              status: json.overallHealth?.status || d.status
+            };
+          }
+          return d;
+        }));
       }
     } catch (e) {
       console.warn('Failed to fetch device info:', e);
     }
   };
 
-  const fetchDiagnostics = async (forceRefresh = false, activePin = userPin) => {
+  const fetchDiagnostics = async (forceRefresh = false, activePin = userPin, overrideHost = null) => {
     try {
       setLoading(true);
       setError(null);
-      const url = `${getApiBase()}/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
+      const activeHost = overrideHost || currentHost || getApiBase();
+      const url = `${activeHost}/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
       const headers = {};
       if (activePin) {
         headers['x-sentinel-pin'] = activePin;
@@ -698,6 +779,11 @@ export default function App() {
         isNativeApp={isAndroidNative()}
         onOpenHostConfig={() => setIsHostConfigModalOpen(true)}
         currentHost={currentHost}
+        fleet={fleet}
+        activeDevice={activeDevice}
+        onSelectDevice={handleSelectDevice}
+        onOpenAddDevice={() => setIsAddDeviceModalOpen(true)}
+        onOpenFleetSettings={() => setIsFleetManagerModalOpen(true)}
       />
 
       {/* 2. Main Content Container */}
@@ -1291,6 +1377,27 @@ export default function App() {
         onHostChanged={(newHost) => {
           setCurrentHost(newHost);
           fetchDiagnostics(true);
+        }}
+      />
+
+      {/* 9. Add PC to Fleet Modal */}
+      <AddDeviceModal
+        isOpen={isAddDeviceModalOpen}
+        onClose={() => setIsAddDeviceModalOpen(false)}
+        onDeviceAdded={handleDeviceAdded}
+      />
+
+      {/* 10. Manage Monitored PC Fleet Modal */}
+      <FleetManagerModal
+        isOpen={isFleetManagerModalOpen}
+        onClose={() => setIsFleetManagerModalOpen(false)}
+        fleet={fleet}
+        activeDevice={activeDevice}
+        onUpdateFleet={handleUpdateFleet}
+        onSelectDevice={handleSelectDevice}
+        onOpenAddDevice={() => {
+          setIsFleetManagerModalOpen(false);
+          setIsAddDeviceModalOpen(true);
         }}
       />
     </div>

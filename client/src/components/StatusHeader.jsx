@@ -1,5 +1,6 @@
 import React from 'react';
 import { Activity, RefreshCw, ShieldAlert, ShieldCheck, AlertTriangle, Monitor, Cpu, Clock, Laptop, Globe, Smartphone, ChevronRight, Server } from 'lucide-react';
+import FleetSwitcher from './FleetSwitcher';
 
 export default function StatusHeader({
   overallHealth,
@@ -13,7 +14,12 @@ export default function StatusHeader({
   onResetHome,
   isNativeApp,
   onOpenHostConfig,
-  currentHost
+  currentHost,
+  fleet = [],
+  activeDevice,
+  onSelectDevice,
+  onOpenAddDevice,
+  onOpenFleetSettings
 }) {
   const getStatusBadge = () => {
     if (isOffline) {
@@ -92,7 +98,17 @@ export default function StatusHeader({
               </p>
             </div>
           </button>
-          <div className="shrink-0">{getStatusBadge()}</div>
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {getStatusBadge()}
+            <FleetSwitcher
+              fleet={fleet}
+              activeDevice={activeDevice}
+              onSelectDevice={onSelectDevice}
+              onOpenAddDevice={onOpenAddDevice}
+              onOpenFleetSettings={onOpenFleetSettings}
+              isNativeApp={isNativeApp}
+            />
+          </div>
         </div>
 
         {/* System Quick Specs & Action Buttons */}

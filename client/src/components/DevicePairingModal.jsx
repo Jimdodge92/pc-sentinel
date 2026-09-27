@@ -139,21 +139,32 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-slate-800 bg-slate-950/30 px-6 gap-2 text-xs font-medium">
+        <div className="flex border-b border-slate-800 bg-slate-950/30 px-6 gap-2 text-xs font-medium overflow-x-auto">
           <button
             onClick={() => setActiveTab('apk')}
-            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
               activeTab === 'apk'
                 ? 'border-emerald-400 text-emerald-300 font-semibold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Download className="w-4 h-4 text-emerald-400" />
-            <span>Download APK (Recommended)</span>
+            <span>Android APK</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('windows')}
+            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'windows'
+                ? 'border-blue-400 text-blue-300 font-semibold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Laptop className="w-4 h-4 text-blue-400" />
+            <span>Windows Setup (.exe)</span>
           </button>
           <button
             onClick={() => setActiveTab('web')}
-            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
               activeTab === 'web'
                 ? 'border-cyan-400 text-cyan-300 font-semibold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -164,7 +175,7 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer ${
+            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
               activeTab === 'settings'
                 ? 'border-cyan-400 text-cyan-300 font-semibold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -247,7 +258,61 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
             </div>
           )}
 
-          {/* 2. Web Companion Tab */}
+          {/* 2. Windows Setup (.exe) Tab */}
+          {activeTab === 'windows' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row items-center gap-6 p-5 rounded-xl bg-slate-950/70 border border-blue-500/30 shadow-inner">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-xl shadow-blue-500/20 shrink-0">
+                  <Laptop className="w-10 h-10" />
+                </div>
+
+                <div className="space-y-3 flex-1 w-full text-center sm:text-left">
+                  <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+                    <span className="text-sm font-bold text-white">PC Sentinel 1-Click Windows Setup</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 font-mono">
+                      v1.0 • {deviceInfo?.installerSizeMB || '32.6'} MB
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Download <strong>PC-Sentinel-Setup.exe</strong> to install on your other computers (Alienware laptop, home desktop, or give to family/cousin). Includes bundled portable Node runtime, auto-start boot service, dying-gasp shutdown trigger, and automatic firewall rules with zero setup.
+                  </p>
+
+                  <div className="flex items-center justify-center sm:justify-start gap-2 pt-1 flex-wrap">
+                    <a
+                      href={deviceInfo?.installerDownloadUrl || `${currentHost}/download/PC-Sentinel-Setup.exe`}
+                      download="PC-Sentinel-Setup.exe"
+                      className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-bold rounded-lg text-xs flex items-center gap-2 shadow-lg shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <ArrowDownToLine className="w-4 h-4" />
+                      <span>Download PC-Sentinel-Setup.exe</span>
+                    </a>
+                    <button
+                      onClick={() => handleCopy(deviceInfo?.installerDownloadUrl || `${currentHost}/download/PC-Sentinel-Setup.exe`)}
+                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700 cursor-pointer"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-blue-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copied ? 'URL Copied!' : 'Copy Download Link'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 space-y-2">
+                <h4 className="font-bold text-white text-xs flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-400" />
+                  <span>Setup Features:</span>
+                </h4>
+                <ul className="list-disc list-inside space-y-1 text-slate-300 text-[11px] leading-relaxed">
+                  <li><strong>Standalone & Portable:</strong> Fully self-contained — no Node.js or manual software installations required.</li>
+                  <li><strong>Instant Dying-Gasp Interceptor:</strong> Listens to Windows ACPI & Event 1074 triggers in &lt;10ms.</li>
+                  <li><strong>Multi-PC Fleet Sync:</strong> Once installed, pair it with your phone companion to monitor all your machines together.</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* 3. Web Companion Tab */}
           {activeTab === 'web' && (
             <div className="space-y-6">
               {/* QR Code and Device Code Card */}

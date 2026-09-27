@@ -32,14 +32,18 @@ Get-Process node -ErrorAction SilentlyContinue | Where-Object {
 Start-Sleep -Milliseconds 500
 
 # 3. Locate node.exe
-$nodePath = "C:\Program Files\nodejs\node.exe"
-if (-not (Test-Path $nodePath)) {
+$localNode = Join-Path $ScriptDir "bin\node.exe"
+if (Test-Path $localNode) {
+    $nodePath = $localNode
+} elseif (Test-Path "C:\Program Files\nodejs\node.exe") {
+    $nodePath = "C:\Program Files\nodejs\node.exe"
+} else {
     $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCmd) { $nodePath = $nodeCmd.Source }
 }
 
 if (-not (Test-Path $nodePath)) {
-    Write-Error "Could not find node.exe! Please ensure Node.js is installed."
+    Write-Error "Could not find node.exe! Please ensure Node.js is installed or bin\node.exe is present."
     exit 1
 }
 
