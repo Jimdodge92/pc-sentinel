@@ -96,33 +96,60 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
     };
   }, []);
 
-  // 2. Camera QR Scanner controls
-  const startCamera = async () => {
-    setCameraError(null);
-    setIsCameraActive(true);
+  // 2. Camera QR Scanner Lifecycle (controlled via useEffect to guarantee mounted DOM element)
+  useEffect(() => {
+    if (!isCameraActive) return;
 
-    try {
-      if (qrScannerRef.current) {
-        try { await qrScannerRef.current.stop(); } catch (e) {}
+    let isMounted = true;
+    let scannerInstance = null;
+
+    const startScanning = async () => {
+      setCameraError(null);
+      try {
+        const elem = document.getElementById('onboarding-qr-reader');
+        if (!elem) {
+          throw new Error('Camera container element not found in DOM.');
+        }
+
+        scannerInstance = new Html5Qrcode('onboarding-qr-reader');
+        qrScannerRef.current = scannerInstance;
+
+        await scannerInstance.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 220, height: 220 } },
+          async (decodedText) => {
+            if (isMounted) {
+              await handleQrScanned(decodedText);
+            }
+          },
+          () => {} // frame noise
+        );
+      } catch (err) {
+        console.warn('QR camera start error:', err);
+        if (isMounted) {
+          setCameraError(
+            err.name === 'NotAllowedError'
+              ? 'Camera permission was not granted. Please check Android Settings > Apps > PC Sentinel > Permissions.'
+              : (err.message || 'Unable to access camera.')
+          );
+          setIsCameraActive(false);
+        }
       }
+    };
 
-      const scanner = new Html5Qrcode('onboarding-qr-reader');
-      qrScannerRef.current = scanner;
+    const timer = setTimeout(startScanning, 150);
 
-      await scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
-        async (decodedText) => {
-          await handleQrScanned(decodedText);
-        },
-        () => {} // ignore frame noise
-      );
-    } catch (err) {
-      console.warn('QR camera error:', err);
-      setCameraError('Camera access required. Please allow camera permissions or enter the 4-digit code.');
-      setIsCameraActive(false);
-    }
-  };
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+      if (scannerInstance) {
+        try {
+          scannerInstance.stop().catch(() => {});
+        } catch (e) {}
+        qrScannerRef.current = null;
+      }
+    };
+  }, [isCameraActive]);
 
   const stopCamera = async () => {
     try {
@@ -133,14 +160,6 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
     } catch (e) {}
     setIsCameraActive(false);
   };
-
-  useEffect(() => {
-    return () => {
-      if (qrScannerRef.current) {
-        try { qrScannerRef.current.stop(); } catch (e) {}
-      }
-    };
-  }, []);
 
   // 3. Process scanned QR payload
   const handleQrScanned = async (decodedText) => {
@@ -382,22 +401,25 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
           </span>
         </div>
 
-        {isCameraActive ? (
-          <div className="space-y-3">
-            <div className="relative rounded-xl overflow-hidden border border-cyan-500/50 bg-black aspect-square max-w-[280px] mx-auto shadow-2xl">
-              <div id="onboarding-qr-reader" className="w-full h-full" />
-              <div className="absolute inset-0 border-2 border-cyan-400/40 rounded-xl pointer-events-none" />
-            </div>
-            <button
-              onClick={stopCamera}
-              className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
-            >
-              Cancel Camera
-            </button>
+        {/* Viewfinder element ALWAYS mounted in DOM to prevent race condition */}
+        <div className={isCameraActive ? "space-y-3" : "hidden"}>
+          <div className="relative rounded-xl overflow-hidden border border-cyan-500/50 bg-black aspect-square max-w-[280px] mx-auto shadow-2xl">
+            <div id="onboarding-qr-reader" className="w-full h-full" />
+            <div className="absolute inset-0 border-2 border-cyan-400/40 rounded-xl pointer-events-none" />
           </div>
-        ) : (
           <button
-            onClick={startCamera}
+            type="button"
+            onClick={stopCamera}
+            className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+          >
+            Cancel Camera
+          </button>
+        </div>
+
+        {!isCameraActive && (
+          <button
+            type="button"
+            onClick={() => setIsCameraActive(true)}
             disabled={isResolving}
             className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
           >
@@ -407,7 +429,12 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
         )}
 
         {cameraError && (
-          <p className="text-[11px] text-rose-400 text-center">{cameraError}</p>
+          <div className="p-3 bg-rose-950/40 border border-rose-500/30 rounded-xl text-[11px] text-rose-300 text-center space-y-1">
+            <p>{cameraError}</p>
+            <p className="text-slate-400">
+              Tip: You can also tap <strong>Pair Now</strong> under <strong>Nearby PCs on Wi-Fi</strong> below!
+            </p>
+          </div>
         )}
       </div>
 

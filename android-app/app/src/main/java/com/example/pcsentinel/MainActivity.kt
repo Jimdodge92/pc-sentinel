@@ -85,7 +85,9 @@ class MainActivity : ComponentActivity() {
 
                 override fun onPermissionRequest(request: PermissionRequest?) {
                     runOnUiThread {
-                        request?.grant(request.resources)
+                        val resources = request?.resources ?: arrayOf()
+                        Log.d("PCSentinelWebView", "onPermissionRequest: granting ${resources.joinToString()}")
+                        request?.grant(resources)
                     }
                 }
             }
@@ -110,7 +112,7 @@ class MainActivity : ComponentActivity() {
             }
 
             addJavascriptInterface(AndroidBridge(this@MainActivity), "AndroidBridge")
-            loadUrl("http://appassets.androidplatform.net/assets/web/index.html")
+            loadUrl("https://appassets.androidplatform.net/assets/web/index.html")
         }
 
         // Wrap in a FrameLayout with WindowInsets to avoid overlapping the camera cutout and navigation bar
