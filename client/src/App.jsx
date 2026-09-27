@@ -12,13 +12,22 @@ import {
   Flame, ZapOff, Radio, RotateCw
 } from 'lucide-react';
 
-// Dynamic Host API Base (supports both Web browser and Android APK native asset loading)
+// Dynamic Host API Base (supports Web browser, remote WAN, and Android APK native asset loading)
+export const isAndroidNative = () => {
+  if (typeof window === 'undefined') return false;
+  return Boolean(
+    window.AndroidBridge ||
+    window.location.hostname === 'appassets.androidplatform.net' ||
+    window.location.protocol === 'file:'
+  );
+};
+
 export const getApiBase = () => {
   if (typeof window !== 'undefined') {
     if (window.SENTINEL_API_BASE) return window.SENTINEL_API_BASE.replace(/\/+$/, '');
     const stored = localStorage.getItem('sentinel_host_url');
     if (stored) return stored.replace(/\/+$/, '');
-    if (window.location.protocol === 'file:') {
+    if (isAndroidNative()) {
       return 'http://173.18.4.217:3500';
     }
   }
@@ -101,12 +110,27 @@ export default function App() {
 
       let res;
       try {
-        res = await fetch(url, { headers });
+        res = await fetch(url, { headers, signal: AbortSignal.timeout(4000) });
       } catch (networkErr) {
-        console.warn('Local host unreachable, checking cloud / offline cache...', networkErr);
+        console.warn('Primary host unreachable, checking LAN / cloud / offline cache...', networkErr);
 
-        // 1. Try Firebase Firestore Cloud Relay if configured
-        const projectId = localStorage.getItem('sentinel_firebase_project') || deviceInfo?.firebaseConfig?.projectId;
+        // If in Android native companion and default WAN IP failed, try local LAN IP (e.g. user is on home Wi-Fi)
+        if (isAndroidNative() && !localStorage.getItem('sentinel_host_url')) {
+          try {
+            const lanUrl = `http://192.168.4.39:3500/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
+            const lanRes = await fetch(lanUrl, { headers, signal: AbortSignal.timeout(4000) });
+            if (lanRes.ok || lanRes.status === 401) {
+              localStorage.setItem('sentinel_host_url', 'http://192.168.4.39:3500');
+              res = lanRes;
+            }
+          } catch (lanErr) {
+            // Keep original networkErr
+          }
+        }
+
+        if (!res) {
+          // 1. Try Firebase Firestore Cloud Relay if configured
+          const projectId = localStorage.getItem('sentinel_firebase_project') || deviceInfo?.firebaseConfig?.projectId;
         const deviceId = localStorage.getItem('sentinel_device_id') || deviceInfo?.deviceId;
         if (projectId && deviceId) {
           try {
@@ -151,6 +175,7 @@ export default function App() {
         }
 
         throw networkErr;
+        }
       }
 
       if (res.status === 401) {

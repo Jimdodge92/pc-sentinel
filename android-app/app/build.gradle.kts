@@ -57,6 +57,9 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
 
+  // Android WebKit & AssetLoader (for ES module & CORS support in WebView)
+  implementation("androidx.webkit:webkit:1.12.1")
+
   // Compose
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.tooling.preview)
