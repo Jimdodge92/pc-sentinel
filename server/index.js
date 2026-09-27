@@ -17,10 +17,20 @@ const {
 const app = express();
 const PORT = process.env.PORT || 3500;
 
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-sentinel-pin, Access-Control-Request-Private-Network, Cache-Control, Accept');
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-sentinel-pin', 'Cache-Control', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-sentinel-pin', 'Cache-Control', 'Accept', 'Access-Control-Request-Private-Network'],
   exposedHeaders: ['Content-Type', 'Content-Disposition']
 }));
 app.options('*', cors());

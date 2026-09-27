@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Server, Wifi, Globe, Check, AlertCircle, RefreshCw, Zap, ArrowRight } from 'lucide-react';
-import { getApiBase } from '../App';
+import { getApiBase, universalFetch } from '../App';
 
 export default function HostConfigModal({ isOpen, onClose, onHostChanged }) {
   const [currentHost, setCurrentHost] = useState('');
@@ -30,7 +30,7 @@ export default function HostConfigModal({ isOpen, onClose, onHostChanged }) {
 
     const startTime = performance.now();
     try {
-      const res = await fetch(`${target}/api/health`, {
+      const res = await universalFetch(`${target}/api/health`, {
         signal: AbortSignal.timeout(3500)
       });
       const latency = Math.round(performance.now() - startTime);
@@ -85,7 +85,7 @@ export default function HostConfigModal({ isOpen, onClose, onHostChanged }) {
     for (const host of candidates) {
       try {
         const start = performance.now();
-        const res = await fetch(`${host}/api/health`, { signal: AbortSignal.timeout(2500) });
+        const res = await universalFetch(`${host}/api/health`, { signal: AbortSignal.timeout(2500) });
         if (res.ok) {
           const lat = Math.round(performance.now() - start);
           detected = { host, latency: lat };

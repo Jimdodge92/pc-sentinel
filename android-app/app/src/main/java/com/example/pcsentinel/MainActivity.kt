@@ -186,6 +186,60 @@ class MainActivity : ComponentActivity() {
         fun getAppVersion(): String {
             return "1.0.0-companion"
         }
+
+        @JavascriptInterface
+        fun httpFetch(urlStr: String, method: String, headersJson: String?, body: String?): String {
+            return try {
+                val url = java.net.URL(urlStr)
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = method.uppercase()
+                conn.connectTimeout = 4000
+                conn.readTimeout = 8000
+                conn.instanceFollowRedirects = true
+                conn.setRequestProperty("User-Agent", "PCSentinelNativeAndroid/1.0")
+
+                if (!headersJson.isNullOrEmpty() && headersJson != "null") {
+                    try {
+                        val json = org.json.JSONObject(headersJson)
+                        val keys = json.keys()
+                        while (keys.hasNext()) {
+                            val key = keys.next()
+                            conn.setRequestProperty(key, json.getString(key))
+                        }
+                    } catch (e: Exception) {
+                        // ignore header parse error
+                    }
+                }
+
+                if (method.uppercase() in listOf("POST", "PUT") && !body.isNullOrEmpty() && body != "null") {
+                    conn.doOutput = true
+                    conn.outputStream.use { os ->
+                        os.write(body.toByteArray(Charsets.UTF_8))
+                    }
+                }
+
+                val statusCode = conn.responseCode
+                val responseBody = if (statusCode in 200..299) {
+                    conn.inputStream.bufferedReader().use { it.readText() }
+                } else {
+                    conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                }
+
+                val resultJson = org.json.JSONObject().apply {
+                    put("status", statusCode)
+                    put("ok", statusCode in 200..299)
+                    put("body", responseBody)
+                }
+                resultJson.toString()
+            } catch (e: Exception) {
+                val errJson = org.json.JSONObject().apply {
+                    put("status", 0)
+                    put("ok", false)
+                    put("error", e.message ?: "Network error")
+                }
+                errJson.toString()
+            }
+        }
     }
 
     override fun onBackPressed() {

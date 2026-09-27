@@ -36,6 +36,33 @@ export const getApiBase = () => {
   return '';
 };
 
+// Universal Fetch: uses native Android HTTP bridge when available to bypass all CORS/PNA restrictions
+export async function universalFetch(url, options = {}) {
+  if (typeof window !== 'undefined' && window.AndroidBridge?.httpFetch) {
+    try {
+      const method = options.method || 'GET';
+      const headersJson = options.headers ? JSON.stringify(options.headers) : null;
+      const body = typeof options.body === 'string' ? options.body : (options.body ? JSON.stringify(options.body) : null);
+      const resRaw = window.AndroidBridge.httpFetch(url, method, headersJson, body);
+      const parsed = JSON.parse(resRaw);
+
+      if (!parsed.ok && parsed.status === 0) {
+        throw new Error(parsed.error || 'Network error');
+      }
+
+      return {
+        ok: parsed.ok,
+        status: parsed.status,
+        json: async () => JSON.parse(parsed.body),
+        text: async () => parsed.body
+      };
+    } catch (e) {
+      console.warn('Native httpFetch failed, falling back to standard fetch:', e);
+    }
+  }
+  return fetch(url, options);
+}
+
 export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -86,7 +113,7 @@ export default function App() {
 
   const fetchDeviceInfo = async () => {
     try {
-      const res = await fetch(`${getApiBase()}/api/device/info`);
+      const res = await universalFetch(`${getApiBase()}/api/device/info`);
       if (res.ok) {
         const json = await res.json();
         setDeviceInfo(json);
@@ -114,7 +141,7 @@ export default function App() {
 
       let res;
       try {
-        res = await fetch(url, { headers, signal: AbortSignal.timeout(4000) });
+        res = await universalFetch(url, { headers, signal: AbortSignal.timeout(4000) });
       } catch (networkErr) {
         console.warn('Primary host unreachable, checking LAN / cloud / offline cache...', networkErr);
 
@@ -122,7 +149,7 @@ export default function App() {
         if (isAndroidNative() && !localStorage.getItem('sentinel_host_url')) {
           try {
             const lanUrl = `http://192.168.4.39:3500/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
-            const lanRes = await fetch(lanUrl, { headers, signal: AbortSignal.timeout(4000) });
+            const lanRes = await universalFetch(lanUrl, { headers, signal: AbortSignal.timeout(4000) });
             if (lanRes.ok || lanRes.status === 401) {
               localStorage.setItem('sentinel_host_url', 'http://192.168.4.39:3500');
               res = lanRes;
@@ -325,7 +352,7 @@ export default function App() {
             pollTimer = setInterval(async () => {
               setReconnectAttempt(prev => prev + 1);
               try {
-                const testRes = await fetch(`${getApiBase()}/api/health`, { signal: AbortSignal.timeout(2000) });
+                const testRes = await universalFetch(`${getApiBase()}/api/health`, { signal: AbortSignal.timeout(2000) });
                 if (testRes.ok) {
                   clearInterval(pollTimer);
                   pollTimer = null;
@@ -364,7 +391,7 @@ export default function App() {
     setPinError(null);
 
     try {
-      const res = await fetch(`${getApiBase()}/api/auth/verify`, {
+      const res = await universalFetch(`${getApiBase()}/api/auth/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin: pinInput })
@@ -543,7 +570,7 @@ export default function App() {
 
       // 1. Persist to server/resolvedIncidents.json via API
       try {
-        await fetch(`${getApiBase()}/api/incidents/resolve`, {
+        await universalFetch(`${getApiBase()}/api/incidents/resolve`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -622,7 +649,7 @@ export default function App() {
 
       // 1. Call backend API to record batch clearance
       try {
-        await fetch(`${getApiBase()}/api/incidents/clear-all-info`, {
+        await universalFetch(`${getApiBase()}/api/incidents/clear-all-info`, {
           method: 'POST',
           headers
         });
