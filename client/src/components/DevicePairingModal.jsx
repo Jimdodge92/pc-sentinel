@@ -356,7 +356,7 @@ export default function DevicePairingModal({ onClose, onRegenerate }) {
 
                   <div className="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/20 text-[11px] text-cyan-300 flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 shrink-0 text-cyan-400" />
-                    <span>Zero IP address configuration needed. Both devices discover each other automatically over Wi-Fi.</span>
+                    <span>Zero IP address configuration needed. Works seamlessly on local Wi-Fi or across the internet via Cloud Relay.</span>
                   </div>
 
                   <div className="flex items-center justify-center sm:justify-start gap-2 pt-1">

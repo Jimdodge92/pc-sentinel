@@ -803,16 +803,19 @@ app.get('/api/device/info', (req, res) => {
   const exeSizeMB = exeExists ? (fs.statSync(exePath).size / (1024 * 1024)).toFixed(1) : null;
 
   const shortCode = device.deviceId ? device.deviceId.replace(/^SENT-/, '') : '';
+  const relayTopic = `pcsentinel-telemetry-${device.deviceId}`;
   const qrPayload = JSON.stringify({
     id: device.deviceId,
     code: shortCode,
     name: device.deviceName,
-    url: `${protocol}://${hostForExternal}`
+    url: `${protocol}://${hostForExternal}`,
+    relayTopic
   });
 
   res.json({
     ...device,
     shortCode,
+    relayTopic,
     qrPayload,
     localIp,
     port: PORT,

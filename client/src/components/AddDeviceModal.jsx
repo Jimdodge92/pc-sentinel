@@ -167,11 +167,26 @@ export default function AddDeviceModal({ isOpen, onClose, onDeviceAdded, existin
 
       if (code) {
         await resolveAndAddByCode(code);
-      } else {
-        throw new Error('Unrecognized PC Sentinel QR code format.');
+        return;
       }
+
+      if (deviceId) {
+        addDeviceToFleet({
+          id: deviceId,
+          name: deviceName || 'PC Sentinel Machine',
+          hostUrl: targetUrl || '',
+          relayTopic: `pcsentinel-telemetry-${deviceId}`,
+          isCloudRelayed: true,
+          status: 'healthy',
+          isOffline: false,
+          lastSeen: new Date().toISOString()
+        });
+        return;
+      }
+
+      throw new Error('Unrecognized PC Sentinel QR code format.');
     } catch (err) {
-      setResolveError(err.message || 'Could not connect to the scanned PC. Please verify both devices are on the same network.');
+      setResolveError(err.message || 'Could not connect to the scanned PC. Please verify PC Sentinel is running on that machine.');
     } finally {
       setIsResolving(false);
     }
@@ -186,7 +201,7 @@ export default function AddDeviceModal({ isOpen, onClose, onDeviceAdded, existin
     setMatchedDevice(null);
 
     try {
-      // 1. Check discovered peers first
+      // 1. Check discovered peers on local network first
       const cleanCode = raw.toLowerCase().replace(/^sent-/, '');
       const localMatch = discoveredPeers.find(p =>
         (p.shortCode && p.shortCode.toLowerCase() === cleanCode) ||
@@ -206,28 +221,63 @@ export default function AddDeviceModal({ isOpen, onClose, onDeviceAdded, existin
         return;
       }
 
-      // 2. Query active server's fleet resolver
-      const res = await universalFetch(`${getApiBase()}/api/fleet/resolve/${encodeURIComponent(raw)}`, {
-        signal: AbortSignal.timeout(3500)
-      });
+      // 2. Query active server's fleet resolver (if on LAN)
+      try {
+        const res = await universalFetch(`${getApiBase()}/api/fleet/resolve/${encodeURIComponent(raw)}`, {
+          signal: AbortSignal.timeout(2000)
+        });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.found && data.device) {
-          addDeviceToFleet({
-            id: data.device.deviceId,
-            name: data.device.deviceName,
-            hostUrl: data.device.url,
-            lanIps: [data.device.ip],
-            status: 'healthy',
-            isOffline: false,
-            lastSeen: new Date().toISOString()
-          });
-          return;
+        if (res.ok) {
+          const data = await res.json();
+          if (data.found && data.device) {
+            addDeviceToFleet({
+              id: data.device.deviceId,
+              name: data.device.deviceName,
+              hostUrl: data.device.url,
+              lanIps: [data.device.ip],
+              status: 'healthy',
+              isOffline: false,
+              lastSeen: new Date().toISOString()
+            });
+            return;
+          }
         }
+      } catch (lanResolveErr) {}
+
+      // 3. Query Universal Zero-Config Cloud Relay (Global Cross-Network Link)
+      try {
+        const relayRes = await universalFetch(`https://ntfy.sh/pcsentinel-pair-${cleanCode}/json?poll=1`, {
+          signal: AbortSignal.timeout(4500)
+        });
+        if (relayRes.ok) {
+          const text = await relayRes.text();
+          const lines = text.trim().split('\n').filter(Boolean);
+          if (lines.length > 0) {
+            const lastMsg = JSON.parse(lines[lines.length - 1]);
+            if (lastMsg.message) {
+              const record = JSON.parse(lastMsg.message);
+              if (record.deviceId) {
+                addDeviceToFleet({
+                  id: record.deviceId,
+                  name: record.deviceName || 'PC Sentinel Machine',
+                  hostUrl: record.lanUrl || '',
+                  lanIps: record.lanIps || [],
+                  relayTopic: record.relayTopic || `pcsentinel-telemetry-${record.deviceId}`,
+                  isCloudRelayed: true,
+                  status: record.status || 'healthy',
+                  isOffline: false,
+                  lastSeen: record.lastSeen || new Date().toISOString()
+                });
+                return;
+              }
+            }
+          }
+        }
+      } catch (cloudErr) {
+        console.warn('Cloud relay pairing lookup notice:', cloudErr);
       }
 
-      throw new Error(`No PC Sentinel machine found with code "${raw}". Make sure PC Sentinel is running on the other PC and both devices are on the same Wi-Fi.`);
+      throw new Error(`No PC Sentinel machine found with code "${raw}". Ensure PC Sentinel is running on the computer.`);
     } catch (err) {
       setResolveError(err.message);
     } finally {

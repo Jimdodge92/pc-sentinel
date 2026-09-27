@@ -200,11 +200,27 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
 
       if (code) {
         await handlePinSubmit(code);
-      } else {
-        throw new Error('Unrecognized QR format. Please scan the QR code from the PC Sentinel desktop application.');
+        return;
       }
+
+      if (deviceId) {
+        completePairing({
+          id: deviceId,
+          name: deviceName || 'PC Sentinel Machine',
+          hostUrl: targetUrl || '',
+          relayTopic: `pcsentinel-telemetry-${deviceId}`,
+          isCloudRelayed: true,
+          status: 'healthy',
+          isDefault: true,
+          isOffline: false,
+          lastSeen: new Date().toISOString()
+        });
+        return;
+      }
+
+      throw new Error('Unrecognized QR format. Please scan the QR code from the PC Sentinel desktop application.');
     } catch (err) {
-      setErrorMsg(err.message || 'Could not connect to the scanned PC. Ensure both devices are on the same Wi-Fi.');
+      setErrorMsg(err.message || 'Could not connect to the scanned PC. Ensure PC Sentinel is running on the computer.');
     } finally {
       setIsResolving(false);
     }
@@ -222,7 +238,7 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
     try {
       const clean = raw.toLowerCase().replace(/^sent-/, '');
 
-      // Check discovered PCs first
+      // Check discovered PCs on local Wi-Fi first
       const peer = discoveredPCs.find(p =>
         (p.shortCode && p.shortCode.toLowerCase() === clean) ||
         (p.deviceId && p.deviceId.toLowerCase() === raw.toLowerCase())
@@ -242,7 +258,7 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
         return;
       }
 
-      // If not in discovered list yet, probe candidate IPs across detected subnets in parallel
+      // If not in discovered list yet, probe candidate IPs across detected subnets in parallel (short 1200ms timeout)
       let phoneIp = '';
       if (typeof window !== 'undefined' && window.AndroidBridge?.getDeviceWifiIp) {
         phoneIp = window.AndroidBridge.getDeviceWifiIp();
@@ -269,7 +285,7 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
         candidateIps.map(async (ip) => {
           try {
             const res = await universalFetch(`http://${ip}:3500/api/device/info`, {
-              signal: AbortSignal.timeout(1500)
+              signal: AbortSignal.timeout(1200)
             });
             if (res.ok) {
               const info = await res.json();
@@ -304,7 +320,41 @@ export default function OnboardingPairing({ onDeviceAdded, isNativeApp }) {
         return;
       }
 
-      throw new Error(`No PC Sentinel machine found with code "${raw}". Ensure PC Sentinel is running on your PC and both devices are on the same Wi-Fi.`);
+      // If local LAN probe did not match, query the Global Universal Cloud Relay
+      try {
+        const relayRes = await universalFetch(`https://ntfy.sh/pcsentinel-pair-${clean}/json?poll=1`, {
+          signal: AbortSignal.timeout(4500)
+        });
+        if (relayRes.ok) {
+          const text = await relayRes.text();
+          const lines = text.trim().split('\n').filter(Boolean);
+          if (lines.length > 0) {
+            const lastMsg = JSON.parse(lines[lines.length - 1]);
+            if (lastMsg.message) {
+              const record = JSON.parse(lastMsg.message);
+              if (record.deviceId) {
+                completePairing({
+                  id: record.deviceId,
+                  name: record.deviceName || 'PC Sentinel Machine',
+                  hostUrl: record.lanUrl || '',
+                  lanIps: record.lanIps || [],
+                  relayTopic: record.relayTopic || `pcsentinel-telemetry-${record.deviceId}`,
+                  isCloudRelayed: true,
+                  status: record.status || 'healthy',
+                  isDefault: true,
+                  isOffline: false,
+                  lastSeen: record.lastSeen || new Date().toISOString()
+                });
+                return;
+              }
+            }
+          }
+        }
+      } catch (cloudErr) {
+        console.warn('Cloud relay pairing in onboarding notice:', cloudErr);
+      }
+
+      throw new Error(`No PC Sentinel machine found with code "${raw}". Ensure PC Sentinel is running on your computer.`);
     } catch (err) {
       setErrorMsg(err.message);
     } finally {

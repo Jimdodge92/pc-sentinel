@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
+const https = require('https');
 
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 
@@ -144,6 +145,91 @@ async function pushToFirebase(telemetryData) {
   }
 }
 
+function getLocalIpAddress() {
+  const nets = os.networkInterfaces();
+  let fallback = '127.0.0.1';
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        if (!net.address.startsWith('169.254')) {
+          return net.address;
+        }
+        fallback = net.address;
+      }
+    }
+  }
+  return fallback;
+}
+
+/**
+ * Universal Zero-Config Cloud Relay:
+ * Publishes pairing announcement to ntfy.sh/pcsentinel-pair-${shortCode}
+ * and full diagnostics snapshot to ntfy.sh/pcsentinel-telemetry-${deviceId}
+ */
+async function publishToCloudRelay(telemetryData) {
+  const cfg = loadConfig();
+  if (!cfg.deviceId) return;
+  const shortCode = cfg.deviceId.replace(/^SENT-/, '');
+  const localIp = getLocalIpAddress();
+
+  const pairingRecord = {
+    deviceId: cfg.deviceId,
+    deviceName: cfg.deviceName || os.hostname() || 'PC-Sentinel-Host',
+    shortCode: shortCode,
+    lanUrl: `http://${localIp}:3500`,
+    lanIps: [localIp],
+    relayTopic: `pcsentinel-telemetry-${cfg.deviceId}`,
+    status: telemetryData?.overallHealth?.status || 'healthy',
+    lastSeen: new Date().toISOString()
+  };
+
+  // 1. Announce pairing info to global rendezvous topic
+  try {
+    const postData = JSON.stringify(pairingRecord);
+    const req = https.request(`https://ntfy.sh/pcsentinel-pair-${shortCode}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Title': `PC Sentinel - ${pairingRecord.deviceName}`
+      },
+      timeout: 5000
+    }, (res) => {
+      res.resume();
+    });
+    req.on('error', () => {});
+    req.write(postData);
+    req.end();
+  } catch (e) {}
+
+  // 2. Publish Full Diagnostics Snapshot to Device Cloud Vault
+  if (telemetryData) {
+    try {
+      const snapJson = JSON.stringify(telemetryData);
+      const req = https.request(`https://ntfy.sh/pcsentinel-telemetry-${cfg.deviceId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Filename': 'diagnostics.json',
+          'Title': `${pairingRecord.deviceName} Diagnostic Snapshot`
+        },
+        timeout: 8000
+      }, (res) => {
+        res.resume();
+      });
+      req.on('error', () => {});
+      req.write(snapJson);
+      req.end();
+    } catch (e) {}
+  }
+
+  // 3. Also push to Firebase if configured
+  if (cfg.firebaseConfig && cfg.firebaseConfig.projectId) {
+    try {
+      await pushToFirebase(telemetryData);
+    } catch (e) {}
+  }
+}
+
 let syncTimer = null;
 let isSyncing = false;
 
@@ -154,24 +240,21 @@ function startFirebaseHeartbeat(getTelemetryCallback) {
   if (syncTimer) clearInterval(syncTimer);
 
   const run = async () => {
-    const cfg = loadConfig();
-    if (!cfg.firebaseConfig || !cfg.firebaseConfig.projectId) return;
-
     if (isSyncing) return;
     isSyncing = true;
     try {
       const telemetry = await getTelemetryCallback();
       if (telemetry) {
-        await pushToFirebase(telemetry);
+        await publishToCloudRelay(telemetry);
       }
     } catch (e) {
-      console.error('[FirebaseRelay] Error in sync loop:', e.message);
+      console.warn('[CloudRelay] Error in heartbeat sync loop:', e.message);
     } finally {
       isSyncing = false;
     }
   };
 
-  setTimeout(run, 3000);
+  setTimeout(run, 1500); // Quick initial heartbeat after boot
   syncTimer = setInterval(run, 30000); // Push every 30 seconds
 }
 
@@ -179,8 +262,8 @@ function startFirebaseHeartbeat(getTelemetryCallback) {
  * Pre-death emergency push (called immediately when Event 86/1074 occurs)
  */
 async function triggerEmergencyPush(telemetryData) {
-  console.log('[FirebaseRelay] 🚨 TRIGGERING PRE-DEATH EMERGENCY SNAPSHOT TO CLOUD...');
-  return await pushToFirebase(telemetryData);
+  console.log('[CloudRelay] 🚨 TRIGGERING PRE-DEATH EMERGENCY SNAPSHOT TO CLOUD RELAY...');
+  return await publishToCloudRelay(telemetryData);
 }
 
 module.exports = {
@@ -188,6 +271,7 @@ module.exports = {
   regenerateDeviceCode,
   setFirebaseConfig,
   pushToFirebase,
+  publishToCloudRelay,
   startFirebaseHeartbeat,
   triggerEmergencyPush
 };

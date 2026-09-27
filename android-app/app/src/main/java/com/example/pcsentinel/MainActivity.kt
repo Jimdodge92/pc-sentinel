@@ -283,6 +283,27 @@ class MainActivity : ComponentActivity() {
                 ""
             }
         }
+
+        @JavascriptInterface
+        fun saveFleet(fleetJson: String): Boolean {
+            return try {
+                val prefs = context.getSharedPreferences("pc_sentinel_prefs", Context.MODE_PRIVATE)
+                prefs.edit().putString("sentinel_fleet", fleetJson).apply()
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+        @JavascriptInterface
+        fun getFleet(): String {
+            return try {
+                val prefs = context.getSharedPreferences("pc_sentinel_prefs", Context.MODE_PRIVATE)
+                prefs.getString("sentinel_fleet", "") ?: ""
+            } catch (e: Exception) {
+                ""
+            }
+        }
     }
 
     override fun onBackPressed() {

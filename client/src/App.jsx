@@ -91,29 +91,37 @@ export default function App() {
   // Top Memory Processes Modal State
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState(false);
 
-  // Multi-PC Fleet Monitoring State
+  // Multi-PC Fleet Monitoring State with Permanent Persistence
   const [fleet, setFleet] = useState(() => {
+    // 1. Try Android Native SharedPreferences first (impervious to WebView cache wipes)
+    if (isAndroidNative()) {
+      try {
+        if (window.AndroidBridge?.getFleet) {
+          const nativeFleet = window.AndroidBridge.getFleet();
+          if (nativeFleet) {
+            const parsed = JSON.parse(nativeFleet);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              return parsed;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 2. Try localStorage
     try {
       const saved = localStorage.getItem('sentinel_device_fleet');
       if (saved) {
-        let parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // SANITIZE: Filter out stale test records referencing ThinkPad or old test IPs
-          parsed = parsed.filter(d =>
-            d.name !== "Jim's ThinkPad" &&
-            !d.hostUrl?.includes('192.168.4.39') &&
-            !(isAndroidNative() && (d.id === 'local-host' || d.hostUrl?.includes('localhost')))
-          );
-          if (parsed.length > 0) return parsed;
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // If native bridge exists, ensure SharedPreferences is synced
+          if (isAndroidNative() && window.AndroidBridge?.saveFleet) {
+            try {
+              window.AndroidBridge.saveFleet(saved);
+            } catch (e) {}
+          }
+          return parsed;
         }
-      }
-    } catch (e) {}
-
-    // Clean up any stale offline cache from legacy ThinkPad tests
-    try {
-      const cached = localStorage.getItem('sentinel_offline_cache');
-      if (cached && (cached.includes('ThinkPad') || cached.includes('192.168.4.39'))) {
-        localStorage.removeItem('sentinel_offline_cache');
       }
     } catch (e) {}
 
@@ -133,13 +141,14 @@ export default function App() {
       ];
     }
 
-    // In Android companion: starts completely clean with 0 devices!
+    // In Android companion: starts with 0 devices until paired
     return [];
   });
+
   const [activeDeviceId, setActiveDeviceId] = useState(() => {
     if (isAndroidNative()) {
       const savedId = localStorage.getItem('sentinel_active_device_id');
-      if (savedId && savedId !== 'local-host' && savedId !== 'SENT-2541') return savedId;
+      if (savedId && savedId !== 'local-host') return savedId;
       return '';
     }
     return localStorage.getItem('sentinel_device_id') || 'local-host';
@@ -149,8 +158,21 @@ export default function App() {
 
   const activeDevice = useMemo(() => {
     if (!fleet || fleet.length === 0) return null;
-    return fleet.find(d => d.id === activeDeviceId) || fleet[0] || null;
+    return fleet.find(d => d.id === activeDeviceId) || fleet.find(d => d.isDefault) || fleet[0] || null;
   }, [fleet, activeDeviceId]);
+
+  // Keep fleet permanently synchronized across localStorage and Android SharedPreferences
+  useEffect(() => {
+    if (fleet && fleet.length > 0) {
+      const json = JSON.stringify(fleet);
+      localStorage.setItem('sentinel_device_fleet', json);
+      if (isAndroidNative() && window.AndroidBridge?.saveFleet) {
+        try {
+          window.AndroidBridge.saveFleet(json);
+        } catch (e) {}
+      }
+    }
+  }, [fleet]);
 
   // Device Pairing & Host Config State
   const [deviceInfo, setDeviceInfo] = useState(null);
@@ -306,10 +328,11 @@ export default function App() {
       }
 
       let res;
+      const lanTimeoutMs = (activeDevice?.isCloudRelayed) ? 4000 : 25000;
       try {
-        res = await universalFetch(url, { headers, signal: AbortSignal.timeout(25000) });
+        res = await universalFetch(url, { headers, signal: AbortSignal.timeout(lanTimeoutMs) });
       } catch (networkErr) {
-        console.warn('Primary host unreachable, checking LAN / cloud / offline cache...', networkErr);
+        console.warn('Primary host unreachable, checking LAN / cloud relay / offline cache...', networkErr);
 
         // If in Android native companion and primary host failed, try local LAN IP if stored
         if (isAndroidNative()) {
@@ -317,7 +340,7 @@ export default function App() {
           if (fallbackHost && fallbackHost !== activeHost) {
             try {
               const lanUrl = `${fallbackHost}/api/diagnostics?days=${daysFilter}${forceRefresh ? '&refresh=true' : ''}`;
-              const lanRes = await universalFetch(lanUrl, { headers, signal: AbortSignal.timeout(15000) });
+              const lanRes = await universalFetch(lanUrl, { headers, signal: AbortSignal.timeout(4000) });
               if (lanRes.ok || lanRes.status === 401) {
                 res = lanRes;
               }
@@ -328,52 +351,107 @@ export default function App() {
         }
 
         if (!res) {
-          // 1. Try Firebase Firestore Cloud Relay if configured
-          const projectId = localStorage.getItem('sentinel_firebase_project') || deviceInfo?.firebaseConfig?.projectId;
-        const deviceId = localStorage.getItem('sentinel_device_id') || deviceInfo?.deviceId;
-        if (projectId && deviceId) {
-          try {
-            const fbRes = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/devices/${deviceId}`);
-            if (fbRes.ok) {
-              const fbDoc = await fbRes.json();
-              const telemetryStr = fbDoc.fields?.telemetryJson?.stringValue;
-              if (telemetryStr) {
-                const parsed = JSON.parse(telemetryStr);
-                localStorage.setItem('sentinel_offline_cache', JSON.stringify(parsed));
-                const hbTime = parsed.scanTime;
-                const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
-                setIsOffline(true);
-                setOfflineInfo({
-                  lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Prior to shutdown',
-                  ageMins
-                });
-                setData(parsed);
-                setPinRequired(false);
-                return;
+          // 1. Try Universal Zero-Config Cloud Relay (Global Cross-Network Link)
+          const relayTopic = activeDevice?.relayTopic || (activeDevice?.id && activeDevice.id !== 'local-host' ? `pcsentinel-telemetry-${activeDevice.id}` : null);
+          if (relayTopic) {
+            try {
+              const ntfyRes = await universalFetch(`https://ntfy.sh/${relayTopic}/json?poll=1`, {
+                signal: AbortSignal.timeout(6000)
+              });
+              if (ntfyRes.ok) {
+                const text = await ntfyRes.text();
+                const lines = text.trim().split('\n').filter(Boolean);
+                if (lines.length > 0) {
+                  const lastMsg = JSON.parse(lines[lines.length - 1]);
+                  let telemetry = null;
+                  if (lastMsg.attachment?.url) {
+                    const attachRes = await universalFetch(lastMsg.attachment.url, {
+                      signal: AbortSignal.timeout(8000)
+                    });
+                    if (attachRes.ok) {
+                      telemetry = await attachRes.json();
+                    }
+                  } else if (lastMsg.message) {
+                    try {
+                      telemetry = JSON.parse(lastMsg.message);
+                    } catch (e) {}
+                  }
+
+                  if (telemetry) {
+                    localStorage.setItem(`sentinel_cache_${activeDevice.id}`, JSON.stringify(telemetry));
+                    localStorage.setItem('sentinel_offline_cache', JSON.stringify(telemetry));
+                    const hbTime = telemetry.scanTime;
+                    const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
+                    if (ageMins > 5) {
+                      setIsOffline(true);
+                      setOfflineInfo({
+                        lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Prior to shutdown',
+                        ageMins
+                      });
+                    } else {
+                      setIsOffline(false);
+                      setOfflineInfo(null);
+                    }
+                    setData(telemetry);
+                    setPinRequired(false);
+                    setLoading(false);
+                    return;
+                  }
+                }
               }
+            } catch (relayErr) {
+              console.warn('Universal Cloud Relay fetch notice:', relayErr);
             }
-          } catch (fbErr) {
-            console.warn('Firestore fetch failed:', fbErr);
           }
-        }
 
-        // 2. Fallback to Local Offline Cache (shows full app even if completely offline)
-        const cachedRaw = localStorage.getItem('sentinel_offline_cache');
-        if (cachedRaw) {
-          const cached = JSON.parse(cachedRaw);
-          const hbTime = cached.scanTime;
-          const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
-          setIsOffline(true);
-          setOfflineInfo({
-            lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Prior to shutdown',
-            ageMins
-          });
-          setData(cached);
-          setPinRequired(false);
-          return;
-        }
+          // 2. Try Firebase Firestore Cloud Relay if configured
+          const projectId = localStorage.getItem('sentinel_firebase_project') || deviceInfo?.firebaseConfig?.projectId;
+          const deviceId = activeDevice?.id || localStorage.getItem('sentinel_device_id') || deviceInfo?.deviceId;
+          if (projectId && deviceId) {
+            try {
+              const fbRes = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/devices/${deviceId}`);
+              if (fbRes.ok) {
+                const fbDoc = await fbRes.json();
+                const telemetryStr = fbDoc.fields?.telemetryJson?.stringValue;
+                if (telemetryStr) {
+                  const parsed = JSON.parse(telemetryStr);
+                  localStorage.setItem(`sentinel_cache_${deviceId}`, JSON.stringify(parsed));
+                  localStorage.setItem('sentinel_offline_cache', JSON.stringify(parsed));
+                  const hbTime = parsed.scanTime;
+                  const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
+                  setIsOffline(true);
+                  setOfflineInfo({
+                    lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Prior to shutdown',
+                    ageMins
+                  });
+                  setData(parsed);
+                  setPinRequired(false);
+                  return;
+                }
+              }
+            } catch (fbErr) {
+              console.warn('Firestore fetch failed:', fbErr);
+            }
+          }
 
-        throw networkErr;
+          // 3. Fallback to Local Offline Cache for this device
+          const devCacheRaw = activeDevice?.id ? localStorage.getItem(`sentinel_cache_${activeDevice.id}`) : null;
+          const cachedRaw = devCacheRaw || localStorage.getItem('sentinel_offline_cache');
+          if (cachedRaw) {
+            const cached = JSON.parse(cachedRaw);
+            const hbTime = cached.scanTime;
+            const ageMins = hbTime ? Math.max(1, Math.round((Date.now() - new Date(hbTime).getTime()) / 60000)) : 0;
+            setIsOffline(true);
+            setOfflineInfo({
+              lastHeartbeat: hbTime ? new Date(hbTime).toLocaleTimeString() : 'Prior to shutdown',
+              ageMins
+            });
+            setData(cached);
+            setPinRequired(false);
+            return;
+          }
+
+          throw networkErr;
         }
       }
 
@@ -411,6 +489,9 @@ export default function App() {
       }
 
       // Cache latest successful scan
+      if (activeDevice?.id) {
+        localStorage.setItem(`sentinel_cache_${activeDevice.id}`, JSON.stringify(json));
+      }
       localStorage.setItem('sentinel_offline_cache', JSON.stringify(json));
       setPinRequired(false);
       setIsOffline(false);
